@@ -222,9 +222,10 @@ fi
 
 scripts/config --file out/.config \
     -e LTO_CLANG \
+    -e CONFIG_LTO_CLANG_FULL \
     -d CONFIG_THINLTO \
     -d CONFIG_LTO_CLANG_THIN \
-    -d CONFIG_ARCH_SUPPORTS_THINLTO \
+    -d CONFIG_ARCH_SUPPORTS_LTO_CLANG_THIN \
     -d CONFIG_LTO_NONE \
     -d CONFIG_CFI_CLANG
 
