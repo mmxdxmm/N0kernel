@@ -6,7 +6,6 @@
 set -e
 
 yes | unzip swappiness-bcache.zip
-yes | unzip swappiness.zip
 TOOLCHAIN_PATH=/lib/llvm-20/bin
 GIT_COMMIT_ID="mmxdxmm"
 

@@ -19,7 +19,6 @@ else
     fi
 fi
 yes | unzip swappiness-bcache.zip
-yes | unzip swappiness.zip
 yes | tar -xvf electron-binutils-2.41.tar.xz
 TOOLCHAIN_PATH=$PWD/android-ndk-r28/toolchains/llvm/prebuilt/linux-x86_64/bin/
 BINUTILS_PATH=$PWD/electron-binutils-2.41/bin
