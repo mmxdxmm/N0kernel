@@ -1,0 +1,270 @@
+#!/bin/bash
+
+# Some logics of this script are copied from [scripts/build_kernel]. Thanks to UtsavBalar1231.
+
+# Ensure the script exits on error
+set -e
+
+if [ -f "android-ndk-r28.zip" ]; then
+    echo "文件已存在，正在解压..."
+    yes | unzip android-ndk-r28.zip
+else
+    echo "文件不存在，正在下载..."
+    wget -O android-ndk-r28.zip "https://dl.google.com/android/repository/android-ndk-r28-linux.zip"
+    if [ $? -eq 0 ]; then
+        echo "下载完成，正在解压..."
+        yes | unzip android-ndk-r28.zip
+    else
+        echo "下载失败，请检查网络或链接是否正确。"
+    fi
+fi
+yes | unzip swappiness-bcache.zip
+yes | unzip swappiness.zip
+yes | tar -xvf electron-binutils-2.41.tar.xz
+TOOLCHAIN_PATH=$PWD/android-ndk-r28/toolchains/llvm/prebuilt/linux-x86_64/bin/
+BINUTILS_PATH=$PWD/electron-binutils-2.41/bin
+GIT_COMMIT_ID="mmxdxmm"
+
+TARGET_DEVICE=$1
+
+if [ -z "$1" ]; then
+    echo "Error: No argument provided, please specific a target device." 
+    echo "If you need KernelSU, please add [ksu] as the second arg."
+    echo "Examples:"
+    echo "Build for lmi(K30 Pro/POCO F2 Pro) without KernelSU:"
+    echo "    bash build.sh lmi"
+    echo "Build for umi(Mi10) with KernelSU:"
+    echo "    bash build.sh umi ksu"
+    exit 1
+fi
+
+
+
+if [ ! -d $TOOLCHAIN_PATH ]; then
+    echo "TOOLCHAIN_PATH [$TOOLCHAIN_PATH] does not exist."
+    echo "Please ensure the toolchain is there, or change TOOLCHAIN_PATH in the script to your toolchain path."
+    exit 1
+fi
+
+echo "TOOLCHAIN_PATH: [$TOOLCHAIN_PATH]"
+export PATH="$BINUTILS_PATH:$TOOLCHAIN_PATH:$PATH"
+
+#if ! command -v aarch64-linux-gnu-ld >/dev/null 2>&1; then
+#    echo "[aarch64-linux-gnu-ld] does not exist, please check your environment."
+#    exit 1
+#fi
+
+#if ! command -v arm-linux-gnueabi-ld >/dev/null 2>&1; then
+#    echo "[arm-linux-gnueabi-ld] does not exist, please check your environment."
+#    exit 1
+#fi
+
+if ! command -v clang >/dev/null 2>&1; then
+    echo "[clang] does not exist, please check your environment."
+    exit 1
+fi
+
+
+# Enable ccache for speed up compiling 
+export CCACHE_DIR="$HOME/.cache/ccache_mikernel" 
+export CC="ccache gcc"
+export CXX="ccache g++"
+export PATH="/usr/lib/ccache:$PATH"
+echo "CCACHE_DIR: [$CCACHE_DIR]"
+
+
+MAKE_ARGS="ARCH=arm64 SUBARCH=arm64 O=out LLVM=1 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu-"
+CFLAGS="-O3 -march=armv8.2-a+crypto+dotprod -mcpu=cortex-a77 -flto -Wno-error"
+
+
+if [ "$1" == "j1" ]; then
+    make $MAKE_ARGS -j1
+    exit
+fi
+
+if [ "$1" == "continue" ]; then
+    make $MAKE_ARGS -j$(nproc)
+    exit
+fi
+
+if [ ! -f "arch/arm64/configs/${TARGET_DEVICE}_defconfig" ]; then
+    echo "No target device [${TARGET_DEVICE}] found."
+    echo "Avaliable defconfigs, please choose one target from below down:"
+    ls arch/arm64/configs/*_defconfig
+    exit 1
+fi
+
+
+# Check clang is existing.
+echo "[clang --version]:"
+clang --version $CFLAGS
+
+
+
+KSU_ZIP_STR=NoKernelSU
+if [ "$2" == "ksu" ]; then
+    KSU_ENABLE=1
+    KSU_ZIP_STR=KernelSU-Next
+else
+    KSU_ENABLE=0
+fi
+
+
+echo "TARGET_DEVICE: $TARGET_DEVICE"
+
+wget -O setup.sh https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh && chmod +x setup.sh && bash ./setup.sh --cleanup
+if [ $KSU_ENABLE -eq 1 ]; then
+    echo "KSU is enabled"
+    yes | unzip susfs-1.5.5.zip
+#    yes | unzip KernelSU-Next-susfs.zip
+#    bash KernelSU-Next/kernel/setup.sh
+#    curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s v1.0.4
+#    cp 10_enable_susfs_for_ksu.patch KernelSU-Next/
+#    cd KernelSU-Next
+#    patch -p1 < 10_enable_susfs_for_ksu.patch
+#    cd ..
+    curl -LSs "https://raw.githubusercontent.com/mmxdxmm/KernelSU-Next/next-susfs/kernel/setup.sh" | bash -s next-susfs
+    sed -i '/config KSU/,/help/{/select OVERLAY_FS/d}' arch/arm64/Kconfig
+else
+    echo "KSU is disabled"
+fi
+    
+
+echo "Cleaning..."
+
+rm -rf out/
+rm -rf anykernel/
+
+echo "Clone AnyKernel3 for packing kernel (repo: https://github.com/liyafe1997/AnyKernel3)"
+git clone https://github.com/liyafe1997/AnyKernel3 -b kona --single-branch --depth=1 anykernel
+#unzip anykernel.zip
+
+# Add date to local version
+local_version_str="-perf"
+local_version_date_str="-$(date +%Y%m%d)-${GIT_COMMIT_ID}-perf"
+
+sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
+sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
+
+# ------------- Building for AOSP -------------
+
+#echo "Building for AOSP......"
+#make $MAKE_ARGS ${TARGET_DEVICE}_defconfig
+
+#if [ $KSU_ENABLE -eq 1 ]; then
+#    scripts/config --file out/.config -e KSU
+#else
+#    scripts/config --file out/.config -d KSU
+#fi
+
+#make $MAKE_ARGS -j$(nproc)
+
+
+#if [ -f "out/arch/arm64/boot/Image" ]; then
+#    echo "The file [out/arch/arm64/boot/Image] exists. AOSP Build successfully."
+#else
+#    echo "The file [out/arch/arm64/boot/Image] does not exist. Seems AOSP build failed."
+#    exit 1
+#fi
+
+#echo "Generating [out/arch/arm64/boot/dtb]......"
+#find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
+
+#rm -rf anykernel/kernels/
+
+#mkdir -p anykernel/kernels/
+
+#cp out/arch/arm64/boot/Image anykernel/kernels/
+#cp out/arch/arm64/boot/dtb anykernel/kernels/
+
+#cd anykernel 
+
+#ZIP_FILENAME=Kernel_AOSP_${TARGET_DEVICE}_${KSU_ZIP_STR}_$(date +'%Y%m%d_%H%M%S')_anykernel3_${GIT_COMMIT_ID}.zip
+
+#zip -r9 $ZIP_FILENAME ./* -x .git .gitignore out/ ./*.zip
+
+#mv $ZIP_FILENAME ../
+
+#cd ..
+
+
+#echo "Build for AOSP finished."
+
+# ------------- End of Building for AOSP -------------
+#  If you don't need AOSP you can comment out the above block [Building for AOSP]
+
+
+# ------------- Building for MIUI -------------
+
+
+echo "Clearning [out/] and build for MIUI....."
+rm -rf out/
+
+#更新所有文件的时间戳为系统时间
+find . -exec touch {} +
+
+make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" $MAKE_ARGS ${TARGET_DEVICE}_defconfig
+
+if [ $KSU_ENABLE -eq 1 ]; then
+    scripts/config --file out/.config \
+    -e KSU \
+    -e KSU_SUSFS \
+    -e KSU_SUSFS_SUS_OVERLAYFS \
+    -e CONFIG_KSU_SUSFS_SUS_SU
+else
+    scripts/config --file out/.config -d KSU
+fi
+
+
+scripts/config --file out/.config \
+    -e LTO_CLANG \
+    -e CONFIG_LTO_CLANG_FULL \
+    -d CONFIG_LTO_CLANG_THIN \
+    -d CONFIG_ARCH_SUPPORTS_LTO_CLANG_THIN \
+    -d CONFIG_LTO_NONE \
+    -e BCACHE \
+    -d CONFIG_BCACHE_DEBUG \
+    -d CONFIG_BCACHE_CLOSURES_DEBUG
+
+make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" $MAKE_ARGS -j$(nproc)
+
+
+
+if [ -f "out/arch/arm64/boot/Image" ]; then
+    echo "The file [out/arch/arm64/boot/Image] exists. MIUI Build successfully."
+else
+    echo "The file [out/arch/arm64/boot/Image] does not exist. Seems MIUI build failed."
+    exit 1
+fi
+
+echo "Generating [out/arch/arm64/boot/dtb]......"
+find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
+
+
+
+rm -rf anykernel/kernels/
+mkdir -p anykernel/kernels/
+
+cp out/arch/arm64/boot/Image anykernel/kernels/
+cp out/arch/arm64/boot/dtb anykernel/kernels/
+
+echo "Build for MIUI finished."
+
+# Restore local version string
+sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
+
+# ------------- End of Building for MIUI -------------
+#  If you don't need MIUI you can comment out the above block [Building for MIUI]
+
+
+cd anykernel 
+
+ZIP_FILENAME=N0kernel_${TARGET_DEVICE}_${KSU_ZIP_STR}_$(date +'%Y%m%d_%H%M%S')_anykernel3_${GIT_COMMIT_ID}.zip
+
+zip -r9 $ZIP_FILENAME ./* -x .git .gitignore out/ ./*.zip
+
+mv $ZIP_FILENAME ../
+
+cd ..
+
+echo "Done. The flashable zip is: [./$ZIP_FILENAME]"
