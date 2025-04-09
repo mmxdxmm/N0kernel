@@ -1,0 +1,38 @@
+name: Build Kernel cmi KernelSU-Next
+
+on:
+  workflow_dispatch:  # 仅允许手动触发工作流
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update and Install Dependencies
+        run: |
+          sudo apt update && sudo apt upgrade -y
+          sudo apt install -y git libssl-dev gcc-arm-linux-gnueabi build-essential libncurses5-dev bzip2 make gcc g++ grep bc curl bison flex openssl lzop unzip zlib1g-dev file ca-certificates ccache wget texinfo xz-utils libelf-dev zip libgmp-dev libncurses-dev g++ gawk m4 libtinfo* cpio binutils-dev libelf-dev cmake ninja-build texinfo u-boot-tools python-is-python3 zstd clang llvm lld
+
+      - name: Download and Install LLVM
+        run: |
+          wget https://apt.llvm.org/llvm.sh -O llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 20
+
+      - name: Build Kernel
+        run: |
+          bash build_thinlto.sh cmi ksu > out.txt
+          dd if=out/.config of=config.txt
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: |
+            out.txt
+            Kernel_MIUI_*
+            Kernel_AOSP_*
+            config.txt
