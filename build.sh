@@ -43,7 +43,7 @@ if [ ! -d $TOOLCHAIN_PATH ]; then
 fi
 
 echo "TOOLCHAIN_PATH: [$TOOLCHAIN_PATH]"
-export PATH="$BINUTILS_PATH:$TOOLCHAIN_PATH:$PATH"
+export PATH="$TOOLCHAIN_PATH:$BINUTILS_PATH:$PATH"
 
 
 # Enable ccache for speed up compiling 
@@ -54,7 +54,7 @@ export PATH="/usr/lib/ccache:$PATH"
 echo "CCACHE_DIR: [$CCACHE_DIR]"
 
 
-MAKE_ARGS="ARCH=arm64 SUBARCH=arm64 O=out LLVM=1"
+MAKE_ARGS="ARCH=arm64 SUBARCH=arm64 O=out LLVM=1 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu-"
 CFLAGS="--target=aarch64-linux-android33 -I$PWD/android-ndk-r28/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include -L$PWD/android-ndk-r28/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/33 -O3 -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto -Wno-error"
 
 
