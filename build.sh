@@ -2,15 +2,16 @@
 
 set -e
 
+mkdir -p clang
 if [ -f "clang.tar.gz" ]; then
     echo "文件已存在，正在解压..."
-    yes | tar -xvf clang.tar.gz -c clang
+    yes | tar -xvf clang.tar.gz -C clang
 else
     echo "文件不存在，正在下载..."
     wget -O clang.tar.gz "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz"
     if [ $? -eq 0 ]; then
         echo "下载完成，正在解压..."
-        yes | tar -xvf clang.tar.gz -c clang
+        yes | tar -xvf clang.tar.gz -C clang
     else
         echo "下载失败，请检查网络或链接是否正确。"
     fi
