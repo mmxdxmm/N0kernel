@@ -2,7 +2,7 @@
 
 set -e
 
-yes | unzip cmi_change.zip
+yes | unzip change.zip
 yes | unzip Makefile.zip
 yes | unzip swappiness-bcache.zip
 TOOLCHAIN_PATH=/lib/llvm-20/bin

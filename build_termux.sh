@@ -2,7 +2,7 @@
 
 set -e
 
-yes | unzip cmi_change.zip
+yes | unzip change.zip
 yes | unzip Makefile.zip
 yes | unzip swappiness-bcache.zip
 TOOLCHAIN_PATH=/data/user/0/com.termux/files/usr/bin

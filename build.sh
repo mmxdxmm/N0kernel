@@ -15,7 +15,7 @@ else
         echo "下载失败，请检查网络或链接是否正确。"
     fi
 fi
-yes | unzip cmi_change.zip
+yes | unzip change.zip
 yes | unzip swappiness-bcache.zip
 yes | tar -xvf electron-binutils-2.41.tar.xz
 TOOLCHAIN_PATH=$PWD/android-ndk-r28b/toolchains/llvm/prebuilt/linux-x86_64/bin/
