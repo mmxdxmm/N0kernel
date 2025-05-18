@@ -2,15 +2,15 @@
 
 set -e
 
-if [ -f "android-ndk-r28b.zip" ]; then
+if [ -f "clang.tar.gz" ]; then
     echo "文件已存在，正在解压..."
-    yes | unzip android-ndk-r28b.zip
+    yes | tar -xvf clang.tar.gz -c clang
 else
     echo "文件不存在，正在下载..."
-    wget -O android-ndk-r28b.zip "https://dl.google.com/android/repository/android-ndk-r28b-linux.zip"
+    wget -O clang.tar.gz "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz"
     if [ $? -eq 0 ]; then
         echo "下载完成，正在解压..."
-        yes | unzip android-ndk-r28b.zip
+        yes | tar -xvf clang.tar.gz -c clang
     else
         echo "下载失败，请检查网络或链接是否正确。"
     fi
@@ -18,7 +18,7 @@ fi
 yes | unzip change.zip
 yes | unzip swappiness-bcache.zip
 yes | tar -xvf electron-binutils-2.41.tar.xz
-TOOLCHAIN_PATH=$PWD/android-ndk-r28b/toolchains/llvm/prebuilt/linux-x86_64/bin/
+TOOLCHAIN_PATH=$PWD/clang/bin
 BINUTILS_PATH=$PWD/electron-binutils-2.41/bin
 GIT_COMMIT_ID="mmxdxmm"
 
@@ -56,8 +56,7 @@ echo "CCACHE_DIR: [$CCACHE_DIR]"
 
 
 MAKE_ARGS="ARCH=arm64 SUBARCH=arm64 O=out LLVM=1 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu-"
-CFLAGS="--target=aarch64-linux-android33 -I$PWD/android-ndk-r28b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include -O3 -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto -Wno-error"
-LDFLAGS="-L$PWD/android-ndk-r28b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/lib/aarch64-linux-android/33"
+CFLAGS="--target=aarch64-linux-musl -O3 -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto -Wno-error"
 
 
 if [ "$1" == "j1" ]; then
