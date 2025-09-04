@@ -23,8 +23,7 @@ jobs:
             libgmp-dev libncurses-dev gawk m4 cpio \
             binutils-dev cmake ninja-build u-boot-tools \
             python3 python3-pip zstd clang llvm lld \
-            libstdc++-12-dev crossbuild-essential-arm64 \
-            lz4
+            libstdc++-12-dev crossbuild-essential-arm64
 
       - name: Install specific LLVM version
         run: |
@@ -48,8 +47,7 @@ jobs:
           # 运行并把输出保存到文件
           bash build.sh cmi ksu > out.txt
           # 复制配置文件
-          [ -f out/.config ] && cp out/.config config.txt 
-          cp out/arch/arm64/boot/Image* ./
+          [ -f out/.config ] && cp out/.config config.txt
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -59,4 +57,3 @@ jobs:
             out.txt
             config.txt
             N0kernel_*
-            image*
