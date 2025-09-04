@@ -177,8 +177,8 @@ find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/d
 rm -rf anykernel/kernels/
 mkdir -p anykernel/kernels/
 
-cp out/arch/arm64/boot/Image anykernel/kernels/
-cp out/arch/arm64/boot/dtb anykernel/kernels/
+cp out/arch/arm64/boot/Image.gz-dtb anykernel/kernels/
+cp out/arch/arm64/boot/Image.lz4-dtb anykernel/kernels/
 
 echo "Build finished."
 
