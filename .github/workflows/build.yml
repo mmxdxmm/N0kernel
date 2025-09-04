@@ -45,7 +45,7 @@ jobs:
           # 确保构建脚本有执行权限
           chmod +x build.sh
           # 使用 tee 命令同时查看输出和保存到文件
-          bash build.sh cmi ksu > out.txt
+          sudo bash build.sh cmi ksu > out.txt
           # 复制配置文件
           [ -f out/.config ] && cp out/.config config.txt
 
