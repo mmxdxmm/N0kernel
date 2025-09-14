@@ -1,4 +1,4 @@
-name: Build Kernel with KernelSU-Next
+name: Build Kernel with SukiSU-Ultra
 
 on:
   workflow_dispatch:  # 仅允许手动触发工作流
