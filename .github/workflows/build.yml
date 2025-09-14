@@ -1,4 +1,4 @@
-name: Build Kernel with SukiSU-Ultra
+name: Build cmi_Kernel
 
 on:
   workflow_dispatch:  # 仅允许手动触发工作流
