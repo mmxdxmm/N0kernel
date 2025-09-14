@@ -85,13 +85,6 @@ wget -O setup.sh https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/se
 if [ $KSU_ENABLE -eq 1 ]; then
     echo "KSU is enabled"
     yes | unzip susfs-1.5.5.zip
-#    yes | unzip KernelSU-Next-susfs.zip
-#    bash KernelSU-Next/kernel/setup.sh
-#    curl -LSs "https://raw.githubusercontent.com/rifsxd/KernelSU-Next/next/kernel/setup.sh" | bash -s v1.0.4
-#    cp 10_enable_susfs_for_ksu.patch KernelSU-Next/
-#    cd KernelSU-Next
-#    patch -p1 < 10_enable_susfs_for_ksu.patch
-#    cd ..
     curl -LSs "https://raw.githubusercontent.com/mmxdxmm/SukiSU-Ultra/susfs-1.5.5/kernel/setup.sh" | bash -s susfs-1.5.5
     sed -i '/config KSU/,/help/{/select OVERLAY_FS/d}' arch/arm64/Kconfig
 else
@@ -132,7 +125,8 @@ if [ $KSU_ENABLE -eq 1 ]; then
     -e KSU \
     -e KSU_SUSFS \
     -e KSU_SUSFS_SUS_OVERLAYFS \
-    -e CONFIG_KSU_SUSFS_SUS_SU
+    -e CONFIG_KSU_SUSFS_SUS_SU \
+    -e CONFIG_KPM
 else
     scripts/config --file out/.config -d KSU
 fi
@@ -161,15 +155,15 @@ rm -rf anykernel/kernels/
 mkdir -p anykernel/kernels/
 
 # Patch for SukiSU KPM support. 
-if [ $KSU_ENABLE -eq 1 ]; then
-    cd out/arch/arm64/boot/
-    wget https://github.com/mmxdxmm/SukiSU_KernelPatch_patch/releases/download/v0.12.0/patch_linux
-    chmod +x patch_linux
-    ./patch_linux
-    rm Image
-    mv oImage Image
-    cd -
-fi
+#if [ $KSU_ENABLE -eq 1 ]; then
+#    cd out/arch/arm64/boot/
+#    wget https://github.com/mmxdxmm/SukiSU_KernelPatch_patch/releases/download/v0.12.0/patch_linux
+#    chmod +x patch_linux
+#    ./patch_linux
+#    rm Image
+#    mv oImage Image
+#    cd -
+#fi
 
 cp out/arch/arm64/boot/Image anykernel/kernels/
 cp out/arch/arm64/boot/dtb anykernel/kernels/
