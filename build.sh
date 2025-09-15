@@ -16,6 +16,7 @@ else
         echo "下载失败，请检查网络或链接是否正确。"
     fi
 fi
+yes | unzip Makefile2.zip
 yes | unzip change.zip
 yes | unzip swappiness.zip
 #yes | tar -xvf electron-binutils-2.41.tar.xz
