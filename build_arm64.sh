@@ -42,8 +42,8 @@ echo "CCACHE_DIR: [$CCACHE_DIR]"
 
 
 MAKE_ARGS="ARCH=arm64 SUBARCH=arm64 O=out LLVM=1"
-CFLAGS="-Os -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto -Wno-error"
-#KCFLAGS="-Wno-default-const-init-field-unsafe -Wno-default-const-init-var-unsafe"
+CFLAGS="-Os -ffunction-sections -fdata-sections -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto -Wno-error"
+LDFLAGS="-Wl,--gc-sections"
 
 
 if [ "$1" == "j1" ]; then
@@ -99,7 +99,6 @@ rm -rf anykernel/
 
 echo "Clone AnyKernel3 for packing kernel (repo: https://github.com/liyafe1997/AnyKernel3)"
 git clone https://github.com/liyafe1997/AnyKernel3 -b kona --single-branch --depth=1 anykernel
-#unzip anykernel.zip
 
 # Add date to local version
 local_version_str="-N0kernel"
@@ -118,7 +117,7 @@ rm -rf out/
 #更新所有文件的时间戳为系统时间
 find . -exec touch {} +
 
-make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" $MAKE_ARGS ${TARGET_DEVICE}_defconfig
+make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS ${TARGET_DEVICE}_defconfig
 
 if [ $KSU_ENABLE -eq 1 ]; then
     scripts/config --file out/.config \
@@ -133,9 +132,10 @@ fi
 
 
 scripts/config --file out/.config \
-    -e LTO_CLANG
+    -e LTO_CLANG \
+    -e CONFIG_KALLSYMS_ALL
 
-make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" $MAKE_ARGS -j$(nproc)
+make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS -j$(nproc)
 
 
 

@@ -58,7 +58,8 @@ echo "CCACHE_DIR: [$CCACHE_DIR]"
 
 
 MAKE_ARGS="ARCH=arm64 SUBARCH=arm64 O=out LLVM=1 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu-"
-CFLAGS="--target=aarch64-linux-musl -O3 -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto -Wno-error"
+CFLAGS="--target=aarch64-linux-musl -Os -ffunction-sections -fdata-sections -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto -Wno-error"
+LDFLAGS="-Wl,--gc-sections"
 
 
 if [ "$1" == "j1" ]; then
@@ -114,7 +115,6 @@ rm -rf anykernel/
 
 echo "Clone AnyKernel3 for packing kernel (repo: https://github.com/liyafe1997/AnyKernel3)"
 git clone https://github.com/liyafe1997/AnyKernel3 -b kona --single-branch --depth=1 anykernel
-#unzip anykernel.zip
 
 # Add date to local version
 local_version_str="-N0kernel"
@@ -140,8 +140,7 @@ if [ $KSU_ENABLE -eq 1 ]; then
     -e KSU_SUSFS \
     -e KSU_SUSFS_SUS_OVERLAYFS \
     -e CONFIG_KSU_SUSFS_SUS_SU \
-    -e CONFIG_KPM \
-    -e CONFIG_KALLSYMS_ALL
+    -e CONFIG_KPM
 else
     scripts/config --file out/.config -d KSU
 fi
@@ -152,9 +151,10 @@ scripts/config --file out/.config \
     -e CONFIG_LTO_CLANG_FULL \
     -d CONFIG_LTO_CLANG_THIN \
     -d CONFIG_ARCH_SUPPORTS_LTO_CLANG_THIN \
-    -d CONFIG_LTO_NONE
+    -d CONFIG_LTO_NONE \
+    -e CONFIG_KALLSYMS_ALL
 
-make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" $MAKE_ARGS -j$(nproc)
+make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS -j$(nproc)
 
 
 
@@ -174,15 +174,15 @@ rm -rf anykernel/kernels/
 mkdir -p anykernel/kernels/
 
 # Patch for SukiSU KPM support. 
-if [ $KSU_ENABLE -eq 1 ]; then
-    cd out/arch/arm64/boot/
-    wget https://github.com/mmxdxmm/SukiSU_KernelPatch_patch/releases/download/v0.12.0/patch_linux
-    chmod +x patch_linux
-    ./patch_linux
-    rm Image
-    mv oImage Image
-    cd -
-fi
+#if [ $KSU_ENABLE -eq 1 ]; then
+#    cd out/arch/arm64/boot/
+#    wget https://github.com/mmxdxmm/SukiSU_KernelPatch_patch/releases/download/v0.12.0/patch_linux
+#    chmod +x patch_linux
+#    ./patch_linux
+#    rm Image
+#    mv oImage Image
+#    cd -
+#fi
 
 cp out/arch/arm64/boot/Image anykernel/kernels/
 cp out/arch/arm64/boot/dtb anykernel/kernels/
