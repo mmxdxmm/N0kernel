@@ -81,7 +81,8 @@ fi
 
 echo "TARGET_DEVICE: $TARGET_DEVICE"
 
-wget -O setup.sh https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh && chmod +x setup.sh && bash ./setup.sh --cleanup
+wget -O setup.sh https://raw.githubusercontent.com/mmxdxmm/SukiSU-Ultra/susfs-1.5.7/kernel/setup.sh && bash setup.sh --cleanup
+
 if [ $KSU_ENABLE -eq 1 ]; then
     echo "KSU is enabled"
     yes | unzip susfs-1.5.5.zip
@@ -97,8 +98,8 @@ echo "Cleaning..."
 rm -rf out/
 rm -rf anykernel/
 
-echo "Clone AnyKernel3 for packing kernel (repo: https://github.com/liyafe1997/AnyKernel3)"
-git clone https://github.com/liyafe1997/AnyKernel3 -b kona --single-branch --depth=1 anykernel
+echo "Clone AnyKernel3 for packing kernel (repo: https://github.com/mmxdxmm/AnyKernel3)"
+git clone https://github.com/mmxdxmm/AnyKernel3 -b kona --single-branch --depth=1 anykernel
 
 # Add date to local version
 local_version_str="-N0kernel"
@@ -115,7 +116,7 @@ echo "Clearning [out/] and build for MIUI....."
 rm -rf out/
 
 #更新所有文件的时间戳为系统时间
-find . -exec touch {} +
+find . -exec touch -h {} +
 
 make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS ${TARGET_DEVICE}_defconfig
 
@@ -133,7 +134,8 @@ fi
 
 scripts/config --file out/.config \
     -e LTO_CLANG \
-    -e CONFIG_KALLSYMS_ALL
+    -e CONFIG_KALLSYMS_ALL \
+    -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 
 make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS -j$(nproc)
 
