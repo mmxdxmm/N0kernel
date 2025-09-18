@@ -45,7 +45,7 @@ jobs:
 
       - name: Build Kernel
         run: |
-          bash build_test.sh cmi ksu | out.txt
+          bash build_test.sh cmi ksu | tee > out.txt
           [ -f out/.config ] && cp out/.config config.txt
 
       - name: Upload Artifacts
