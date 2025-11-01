@@ -8,7 +8,7 @@ if [ -f "clang.tar.gz" ]; then
     yes | tar -xvf clang.tar.gz -C clang
 else
     echo "文件不存在，正在下载..."
-    wget -nv -O clang.tar.gz "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz"
+    wget -nv -O clang.tar.gz "https://github.com/mmxdxmm/aosp-clang/releases/download/r563880c/clang-r563880c.tar.gz"
     if [ $? -eq 0 ]; then
         echo "下载完成，正在解压..."
         yes | tar -xvf clang.tar.gz -C clang
@@ -16,6 +16,7 @@ else
         echo "下载失败，请检查网络或链接是否正确。"
     fi
 fi
+
 yes | unzip Makefile2.zip
 yes | unzip change.zip
 yes | unzip swappiness.zip
