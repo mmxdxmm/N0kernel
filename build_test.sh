@@ -56,8 +56,8 @@ echo "CCACHE_DIR: [$CCACHE_DIR]"
 
 
 MAKE_ARGS="ARCH=arm64 SUBARCH=arm64 O=out LVM=1 LLVM_IAS=1 AR=llvm-ar NM=llvm-nm STRIP=llvm-strip OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump HOSTAR=llvm-ar"
-set_C="ccache clang -v --target=aarch64-linux-gnu -Os -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto -Wno-error -ffunction-sections -fdata-sections"
-set_HOSTC="ccache clang -v --target=x86_64-linux-gnu -Os -flto -Wno-error -ffunction-sections -fdata-sections"
+set_C="ccache clang -v --target=aarch64-linux-musl -Os -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto -Wno-error -ffunction-sections -fdata-sections"
+set_HOSTC="ccache clang -v -Os -flto -Wno-error -ffunction-sections -fdata-sections"
 set_LD="ld.lld --strip-debug"
 set_HOSTLD="ld.lld --strip-debug --gc-sections"
 
@@ -178,7 +178,8 @@ scripts/config --file out/.config \
     -d CONFIG_LTE_GDM724X \
     -d CONFIG_CRYPTO_TEST \
     -d CONFIG_ARM64_RELOC_TEST \
-    -d CONFIG_LIB80211_DEBUG
+    -d CONFIG_LIB80211_DEBUG \
+    -e CONFIG_ZONE_DMA32
 
 make LD="$set_LD" HOSTLD="$set_HOSTLD" CC="$set_C" CXX="$set_C" HOSTCC="$set_HOSTC" HOSTCXX="$set_HOSTC" $MAKE_ARGS -j$(nproc)
 
