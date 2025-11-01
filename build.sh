@@ -8,7 +8,7 @@ if [ -f "clang.tar.gz" ]; then
     yes | tar -xvf clang.tar.gz -C clang
 else
     echo "文件不存在，正在下载..."
-    wget -nv -O clang.tar.gz "https://github.com/mmxdxmm/aosp-clang/releases/download/r563880c/clang-r563880c.tar.gz"
+    wget -nv -O clang.tar.gz "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz"
     if [ $? -eq 0 ]; then
         echo "下载完成，正在解压..."
         yes | tar -xvf clang.tar.gz -C clang
@@ -16,7 +16,7 @@ else
         echo "下载失败，请检查网络或链接是否正确。"
     fi
 fi
-
+yes | unzip Makefile2.zip
 yes | unzip change.zip
 yes | unzip swappiness.zip
 #yes | tar -xvf electron-binutils-2.41.tar.xz
@@ -50,16 +50,16 @@ export PATH="$TOOLCHAIN_PATH:$PATH"
 
 
 # Enable ccache for speed up compiling 
-export CCACHE_DIR="$HOME/.cache/ccache_mikernel"
+export CCACHE_DIR="$HOME/.cache/ccache_mikernel" 
+export CC="ccache clang"
+export CXX="ccache clang++"
 export PATH="/usr/lib/ccache:$PATH"
 echo "CCACHE_DIR: [$CCACHE_DIR]"
 
 
-MAKE_ARGS="ARCH=arm64 SUBARCH=arm64 O=out LVM=1 LLVM_IAS=1 AR=llvm-ar NM=llvm-nm STRIP=llvm-strip OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump HOSTAR=llvm-ar"
-set_C="ccache clang --target=aarch64-linux-musl -Os -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto -Wno-error -ffunction-sections -fdata-sections"
-set_HOSTC="ccache clang -Os -flto -Wno-error -ffunction-sections -fdata-sections"
-set_LD="ld.lld --strip-debug"
-set_HOSTLD="ld.lld --strip-debug --gc-sections"
+MAKE_ARGS="ARCH=arm64 SUBARCH=arm64 O=out LLVM=1 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu-"
+CFLAGS="--target=aarch64-linux-musl -Os -ffunction-sections -fdata-sections -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto -Wno-error"
+LDFLAGS="-Wl,--gc-sections"
 
 
 if [ "$1" == "j1" ]; then
@@ -133,7 +133,7 @@ rm -rf out/
 #更新所有文件的时间戳为系统时间
 find . -exec touch -h {} +
 
-make LD="$set_LD" HOSTLD="$set_HOSTLD" CC="$set_C" CXX="$set_C" HOSTCC="$set_HOSTC" HOSTCXX="$set_HOSTC" $MAKE_ARGS ${TARGET_DEVICE}_defconfig
+make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS ${TARGET_DEVICE}_defconfig
 
 if [ $KSU_ENABLE -eq 1 ]; then
     scripts/config --file out/.config \
@@ -153,34 +153,10 @@ scripts/config --file out/.config \
     -d CONFIG_LTO_CLANG_THIN \
     -d CONFIG_ARCH_SUPPORTS_LTO_CLANG_THIN \
     -d CONFIG_LTO_NONE \
-    -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION \
-    -e CONFIG_MODULES \
-    -d CONFIG_KPROBES \
-    -e CONFIG_MODULE_FORCE_LOAD \
-    -e CONFIG_MODULE_UNLOAD \
-    -e CONFIG_MODULE_FORCE_UNLOAD \
-    -d CONFIG_MODVERSIONS \
-    -d CONFIG_MODULE_SRCVERSION_ALL \
-    -d CONFIG_MODULE_SIG \
-    -e CONFIG_MODULE_COMPRESS \
-    -e CONFIG_MODULE_COMPRESS_GZIP \
-    -d CONFIG_MODULE_COMPRESS_XZ \
-    -d CONFIG_TRIM_UNUSED_KSYMS \
-    -d CONFIG_TEST_ASYNC_DRIVER_PROBE \
-    -d CONFIG_MTD_TESTS \
-    -d CONFIG_I2C_STUB \
-    -d CONFIG_SPI_LOOPBACK_TEST \
-    -d CONFIG_RTL8192U \
-    -d CONFIG_RTLLIB \
-    -d CONFIG_RTL8723BS \
-    -d CONFIG_R8188EU \
-    -e CONFIG_88EU_AP_MODE \
-    -d CONFIG_LTE_GDM724X \
-    -d CONFIG_CRYPTO_TEST \
-    -d CONFIG_ARM64_RELOC_TEST \
-    -d CONFIG_LIB80211_DEBUG
+    -e CONFIG_KALLSYMS_ALL \
+    -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 
-make LD="$set_LD" HOSTLD="$set_HOSTLD" CC="$set_C" CXX="$set_C" HOSTCC="$set_HOSTC" HOSTCXX="$set_HOSTC" $MAKE_ARGS -j$(nproc)
+make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS -j$(nproc)
 
 
 
