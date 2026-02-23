@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04  # Updated to newer Ubuntu version
+    runs-on: ubuntu-latest  # Updated to newer Ubuntu version
 
     steps:
       - name: Checkout repository
@@ -24,7 +24,7 @@ jobs:
 
       - name: Build Kernel
         run: |
-          bash build_test.sh cmi ksu > out.txt
+          bash build_test.sh cmi ksu | tee out.txt
           [ -f out/.config ] && cp out/.config config.txt
 
       - name: Upload Artifacts
