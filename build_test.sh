@@ -130,7 +130,7 @@ rm -rf out/
 #更新所有文件的时间戳为系统时间
 find . -exec touch -h {} +
 
-make $MAKE_ARGS ${TARGET_DEVICE}_defconfig
+make LD="$set_LD" HOSTLD="$set_HOSTLD" CC="$set_C" CXX="$set_C" HOSTCC="$set_HOSTC" HOSTCXX="$set_HOSTC" $MAKE_ARGS ${TARGET_DEVICE}_defconfig
 
 if [ $KSU_ENABLE -eq 1 ]; then
     scripts/config --file out/.config \
@@ -153,7 +153,7 @@ scripts/config --file out/.config \
     -e CONFIG_KALLSYMS_ALL \
     -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 
-make $MAKE_ARGS -j$(nproc)
+make LD="$set_LD" HOSTLD="$set_HOSTLD" CC="$set_C" CXX="$set_C" HOSTCC="$set_HOSTC" HOSTCXX="$set_HOSTC" $MAKE_ARGS -j$(nproc)
 
 
 
