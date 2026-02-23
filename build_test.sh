@@ -16,9 +16,7 @@ else
     fi
 fi
 
-#yes | unzip Makefile2.zip
-#yes | unzip change.zip
-#yes | unzip swappiness.zip
+yes | unzip change.zip
 #yes | tar -xvf electron-binutils-2.41.tar.xz
 TOOLCHAIN_PATH=$PWD/android-ndk-r29/toolchains/llvm/prebuilt/linux-x86_64/bin
 #BINUTILS_PATH=$PWD/electron-binutils-2.41/bin
@@ -97,12 +95,12 @@ fi
 
 echo "TARGET_DEVICE: $TARGET_DEVICE"
 
-wget -O setup.sh https://raw.githubusercontent.com/mmxdxmm/SukiSU-Ultra/v3.2.0/kernel/setup.sh && bash setup.sh --cleanup
+wget -O setup.sh https://raw.githubusercontent.com/mmxdxmm/SukiSU-Ultra/susfs-1.5.5/kernel/setup.sh && chmod +x setup.sh && bash ./setup.sh --cleanup
 
 if [ $KSU_ENABLE -eq 1 ]; then
     echo "KSU is enabled"
-#    yes | unzip susfs-1.5.5.zip
-    curl -LSs "https://raw.githubusercontent.com/mmxdxmm/SukiSU-Ultra/v3.2.0/kernel/setup.sh" | bash -s v3.2.0
+    yes | unzip susfs-1.5.5.zip
+    curl -LSs "https://raw.githubusercontent.com/mmxdxmm/SukiSU-Ultra/susfs-1.5.5/kernel/setup.sh" | bash -s susfs-1.5.5
     sed -i '/config KSU/,/help/{/select OVERLAY_FS/d}' arch/arm64/Kconfig
 else
     echo "KSU is disabled"
@@ -117,10 +115,9 @@ rm -rf anykernel/
 echo "Clone AnyKernel3 for packing kernel (repo: https://github.com/mmxdxmm/AnyKernel3)"
 git clone https://github.com/mmxdxmm/AnyKernel3 -b main --single-branch --depth=1 anykernel
 
-# Add date to local version
-#local_version_str="-perf"
+# 添加内核信息
+#local_version_str="-N0kernel"
 #local_version_date_str="-$(date +%Y%m%d)-${GIT_COMMIT_ID}-N0kernel"
-
 #sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
 #sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
 
@@ -133,11 +130,14 @@ rm -rf out/
 #更新所有文件的时间戳为系统时间
 find . -exec touch -h {} +
 
-make LD="$set_LD" HOSTLD="$set_HOSTLD" CC="$set_C" CXX="$set_C" HOSTCC="$set_HOSTC" HOSTCXX="$set_HOSTC" $MAKE_ARGS ${TARGET_DEVICE}_defconfig
+make $MAKE_ARGS ${TARGET_DEVICE}_defconfig
 
 if [ $KSU_ENABLE -eq 1 ]; then
     scripts/config --file out/.config \
     -e KSU \
+    -e KSU_SUSFS \
+    -e KSU_SUSFS_SUS_OVERLAYFS \
+    -e CONFIG_KSU_SUSFS_SUS_SU \
     -e CONFIG_KPM
 else
     scripts/config --file out/.config -d KSU
@@ -153,7 +153,7 @@ scripts/config --file out/.config \
     -e CONFIG_KALLSYMS_ALL \
     -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 
-make LD="$set_LD" HOSTLD="$set_HOSTLD" CC="$set_C" CXX="$set_C" HOSTCC="$set_HOSTC" HOSTCXX="$set_HOSTC" $MAKE_ARGS -j$(nproc)
+make $MAKE_ARGS -j$(nproc)
 
 
 
@@ -173,15 +173,15 @@ rm -rf anykernel/Image
 rm -rf anykernel/dtb
 
 # Patch for SukiSU KPM support. 
-#if [ $KSU_ENABLE -eq 1 ]; then
-#    cd out/arch/arm64/boot/
-#    wget https://github.com/mmxdxmm/SukiSU_KernelPatch_patch/releases/download/v0.12.0/patch_linux
-#    chmod +x patch_linux
-#    ./patch_linux
-#    rm Image
-#    mv oImage Image
-#    cd -
-#fi
+if [ $KSU_ENABLE -eq 1 ]; then
+    cd out/arch/arm64/boot/
+    wget https://github.com/mmxdxmm/SukiSU_KernelPatch_patch/releases/download/v0.12.0/patch_linux
+    chmod +x patch_linux
+    ./patch_linux
+    rm Image
+    mv oImage Image
+    cd -
+fi
 
 cp out/arch/arm64/boot/Image anykernel/
 cp out/arch/arm64/boot/dtb anykernel/
