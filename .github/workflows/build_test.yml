@@ -13,7 +13,7 @@ jobs:
 
       - name: Update and Install Dependencies
         run: |
-          sudo apt update && sudo apt install build-essential git curl wget bison flex zip bc cpio libssl-dev ccache lz4 gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi -y
+          sudo apt update && sudo apt install build-essential git curl wget bison flex zip bc cpio libssl-dev ccache lz4 gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi python2 -y
 # && sudo apt upgrade -y
 
       # LLVM-20 installation (commented out)
