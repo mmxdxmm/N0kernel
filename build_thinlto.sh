@@ -129,7 +129,7 @@ rm -rf out/
 #更新所有文件的时间戳为系统时间
 find . -exec touch -h {} +
 
-make CFLAGS="-mcpu=cortex-a77" $MAKE_ARGS ${TARGET_DEVICE}_defconfig
+make $MAKE_ARGS ${TARGET_DEVICE}_defconfig
 
 if [ $KSU_ENABLE -eq 1 ]; then
     scripts/config --file out/.config \
@@ -179,7 +179,7 @@ scripts/config --file out/.config \
     -e CONFIG_KALLSYMS_ALL \
     -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 
-make KCFLAGS="-mcpu=cortex-a77" $MAKE_ARGS -j$(nproc) Image.lz4 dtbs
+make $MAKE_ARGS -j$(nproc) Image.lz4 dtbs
 
 
 
