@@ -146,10 +146,10 @@ fi
 
 scripts/config --file out/.config \
     -e LTO_CLANG \
-    -e CONFIG_LTO \
-    -d CONFIG_THINLTO \
+    -d CONFIG_LTO \
+    -e CONFIG_THINLTO \
     -e CONFIG_ARCH_SUPPORTS_LTO_CLANG \
-    -d CONFIG_ARCH_SUPPORTS_THINLTO \
+    -e CONFIG_ARCH_SUPPORTS_THINLTO \
     -d CONFIG_LTO_NONE \
     -d CONFIG_CFI_CLANG \
     -e CONFIG_KALLSYMS_ALL \
