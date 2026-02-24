@@ -146,17 +146,17 @@ fi
 
 scripts/config --file out/.config \
     -e LTO_CLANG \
-    -d CONFIG_LTO \
+    -e CONFIG_LTO \
     -e CONFIG_THINLTO \
     -e CONFIG_ARCH_SUPPORTS_LTO_CLANG \
     -e CONFIG_ARCH_SUPPORTS_THINLTO \
     -d CONFIG_LTO_NONE \
     -d CONFIG_CFI_CLANG \
+    -e CONFIG_KERNEL_LZ4 \
     -e CONFIG_KALLSYMS_ALL \
     -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 
-make LD="$set_LD" HOSTLD="$set_HOSTLD" CC="$set_C" CXX="$set_C" HOSTCC="$set_HOSTC" HOSTCXX="$set_HOSTC" $MAKE_ARGS -j$(nproc) Image.lz4
-make LD="$set_LD" HOSTLD="$set_HOSTLD" CC="$set_C" CXX="$set_C" HOSTCC="$set_HOSTC" HOSTCXX="$set_HOSTC" $MAKE_ARGS -j$(nproc) dtbs
+make LD="$set_LD" HOSTLD="$set_HOSTLD" CC="$set_C" CXX="$set_C" HOSTCC="$set_HOSTC" HOSTCXX="$set_HOSTC" $MAKE_ARGS -j$(nproc) Image.lz4 dtbs
 
 
 if [ -f "out/arch/arm64/boot/Image" ]; then
@@ -185,13 +185,13 @@ rm -rf anykernel/dtb
 #    cd -
 #fi
 
-cp out/arch/arm64/boot/Image* anykernel/
+cp out/arch/arm64/boot/Image anykernel/
 cp out/arch/arm64/boot/dtb anykernel/
 
 echo "Build finished."
 
-# Restore local version string
-sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
+# 恢复内核信息
+#sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
 
 # ------------- End of Building -------------
 
