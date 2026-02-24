@@ -146,9 +146,10 @@ fi
 
 scripts/config --file out/.config \
     -e LTO_CLANG \
-    -e CONFIG_LTO_CLANG_FULL \
-    -d CONFIG_LTO_CLANG_THIN \
-    -d CONFIG_ARCH_SUPPORTS_LTO_CLANG_THIN \
+    -e CONFIG_LTO \
+    -d CONFIG_THINLTO \
+    -e CONFIG_ARCH_SUPPORTS_LTO_CLANG \
+    -d CONFIG_ARCH_SUPPORTS_THINLTO \
     -d CONFIG_LTO_NONE \
     -e CONFIG_KALLSYMS_ALL \
     -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
@@ -169,21 +170,21 @@ find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/d
 
 
 
-rm -rf anykernel/Image
+rm -rf anykernel/Image*
 rm -rf anykernel/dtb
 
 # Patch for SukiSU KPM support. 
-if [ $KSU_ENABLE -eq 1 ]; then
-    cd out/arch/arm64/boot/
-    wget https://github.com/mmxdxmm/SukiSU_KernelPatch_patch/releases/download/v0.12.0/patch_linux
-    chmod +x patch_linux
-    ./patch_linux
-    rm Image
-    mv oImage Image
-    cd -
-fi
+#if [ $KSU_ENABLE -eq 1 ]; then
+#    cd out/arch/arm64/boot/
+#    wget https://github.com/mmxdxmm/SukiSU_KernelPatch_patch/releases/download/v0.12.0/patch_linux
+#    chmod +x patch_linux
+#    ./patch_linux
+#    rm Image
+#    mv oImage Image
+#    cd -
+#fi
 
-cp out/arch/arm64/boot/Image anykernel/
+cp out/arch/arm64/boot/Image* anykernel/
 cp out/arch/arm64/boot/dtb anykernel/
 
 echo "Build finished."
