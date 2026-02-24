@@ -179,7 +179,7 @@ scripts/config --file out/.config \
     -e CONFIG_KALLSYMS_ALL \
     -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 
-make $MAKE_ARGS -j1 Image.lz4 dtbs
+make $MAKE_ARGS -j$(nproc) Image.lz4 dtbs
 
 
 
