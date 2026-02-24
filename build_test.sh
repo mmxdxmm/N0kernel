@@ -152,11 +152,10 @@ scripts/config --file out/.config \
     -e CONFIG_ARCH_SUPPORTS_THINLTO \
     -d CONFIG_LTO_NONE \
     -d CONFIG_CFI_CLANG \
-    -e CONFIG_KERNEL_LZ4 \
     -e CONFIG_KALLSYMS_ALL \
     -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 
-make LD="$set_LD" HOSTLD="$set_HOSTLD" CC="$set_C" CXX="$set_C" HOSTCC="$set_HOSTC" HOSTCXX="$set_HOSTC" $MAKE_ARGS -j$(nproc) Image.lz4 dtbs
+make LD="$set_LD" HOSTLD="$set_HOSTLD" CC="$set_C" CXX="$set_C" HOSTCC="$set_HOSTC" HOSTCXX="$set_HOSTC" $MAKE_ARGS -j$(nproc) Image-dtb
 
 
 if [ -f "out/arch/arm64/boot/Image" ]; then
@@ -185,8 +184,8 @@ rm -rf anykernel/dtb
 #    cd -
 #fi
 
-cp out/arch/arm64/boot/Image anykernel/
-cp out/arch/arm64/boot/dtb anykernel/
+cp out/arch/arm64/boot/Image-dtb anykernel/
+#cp out/arch/arm64/boot/dtb anykernel/
 
 echo "Build finished."
 
