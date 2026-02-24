@@ -27,7 +27,7 @@ jobs:
         run: |
           bash build_thinlto.sh cmi ksu > out.txt
           [ -f out/.config ] && cp out/.config config.txt
-          [ -f out/arch/arm64/boot/Image.lz4 ] && cp out/arch/arm64/boot/Image.lz4 Image.lz4
+          [ -f out/arch/arm64/boot/Image.gz ] && cp out/arch/arm64/boot/Image.gz Image.gz
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -37,4 +37,4 @@ jobs:
             out.txt
             N0kernel_*
             config.txt
-            Image.lz4
+            Image.gz
