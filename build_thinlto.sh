@@ -176,6 +176,7 @@ scripts/config --file out/.config \
     -d CONFIG_LIB80211_DEBUG \
     -e CONFIG_KALLSYMS_ALL \
     -e CONFIG_KERNEL_LZ4 \
+    -e CONFIG_KALLSYMS_ALL \
     -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 
 make $MAKE_ARGS -j$(nproc) Image.lz4 dtbs
