@@ -23,17 +23,11 @@ jobs:
       #     chmod +x llvm.sh
       #     sudo ./llvm.sh 20
 
-      - name: Install Python 2.7 from source
-        run: |
-          sudo apt install -y zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev libffi-dev liblzma-dev
-          wget https://www.python.org/ftp/python/2.7.18/Python-2.7.18.tar.xz
-          tar -xf Python-2.7.18.tar.xz
-          cd Python-2.7.18
-          ./configure --enable-optimizations
-          make -j$(nproc)
-          sudo make altinstall  # 安装为 python2.7，不覆盖系统 python3
-          sudo ln -sf /usr/local/bin/python2.7 /usr/bin/python2
-          cd .. && rm -rf Python-2.7.18*
+      - name: Install Python 2.7
+        uses: actions/setup-python@v5
+        with:
+          python-version: '2.7'
+          architecture: 'x64'  # 可根据需要指定架构
       
       - name: Build Kernel
         run: |
