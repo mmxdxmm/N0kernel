@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # Updated to newer Ubuntu version
+    runs-on: debian-latest  # Updated to newer Ubuntu version
 
     steps:
       - name: Checkout repository
@@ -13,7 +13,7 @@ jobs:
 
       - name: Update and Install Dependencies
         run: |
-          sudo apt update && sudo apt install build-essential git curl wget bison flex zip bc cpio libssl-dev ccache lz4 gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi -y
+          sudo apt update && sudo apt install build-essential git curl wget bison flex zip bc cpio libssl-dev ccache lz4 gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi python2 -y
 # && sudo apt upgrade -y
 
       # LLVM-20 installation (commented out)
@@ -22,13 +22,6 @@ jobs:
       #     wget https://apt.llvm.org/llvm.sh -O llvm.sh
       #     chmod +x llvm.sh
       #     sudo ./llvm.sh 20
-
-      - name: Install Python 2
-        run: |
-          sudo apt install -y software-properties-common
-          sudo add-apt-repository ppa:deadsnakes/ppa
-          sudo apt update
-          sudo apt install -y python2
       
       - name: Build Kernel
         run: |
