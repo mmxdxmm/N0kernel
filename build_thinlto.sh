@@ -175,11 +175,9 @@ scripts/config --file out/.config \
     -d CONFIG_ARM64_RELOC_TEST \
     -d CONFIG_LIB80211_DEBUG \
     -e CONFIG_KALLSYMS_ALL \
-    -e CONFIG_KERNEL_LZ4 \
-    -e CONFIG_KALLSYMS_ALL \
     -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 
-make $MAKE_ARGS -j$(nproc) Image.lz4 dtbs
+make $MAKE_ARGS -j$(nproc) Image-dtb
 
 
 
@@ -209,8 +207,8 @@ rm -rf anykernel/dtb
 #    cd -
 #fi
 
-cp out/arch/arm64/boot/Image anykernel/
-cp out/arch/arm64/boot/dtb anykernel/
+cp out/arch/arm64/boot/Image-dtb anykernel/
+#cp out/arch/arm64/boot/dtb anykernel/
 
 echo "Build finished."
 
