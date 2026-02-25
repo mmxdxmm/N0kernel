@@ -49,14 +49,16 @@ export PATH="$TOOLCHAIN_PATH:$PATH"
 
 
 # Enable ccache for speed up compiling 
-export CCACHE_DIR="$HOME/.cache/ccache_mikernel" 
-export CC="ccache clang"
-export CXX="ccache clang++"
+export CCACHE_DIR="$HOME/.cache/ccache_mikernel"
 export PATH="/usr/lib/ccache:$PATH"
 echo "CCACHE_DIR: [$CCACHE_DIR]"
 
 
-MAKE_ARGS="ARCH=arm64 SUBARCH=arm64 O=out LLVM=1 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu-"
+MAKE_ARGS="ARCH=arm64 SUBARCH=arm64 O=out LVM=1 LLVM_IAS=1 AR=llvm-ar NM=llvm-nm STRIP=llvm-strip OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump HOSTAR=llvm-ar"
+set_C="ccache clang --target=aarch64-linux-musl -O3 -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto=thin -Wno-error -ffunction-sections -fdata-sections"
+set_HOSTC="ccache clang -O3 -flto=thin -Wno-error -ffunction-sections -fdata-sections"
+set_LD="ld.lld --strip-debug -O3 --plugin-opt=O3"
+set_HOSTLD="ld.lld --strip-debug --gc-sections -O3 --plugin-opt=O3"
 
 
 if [ "$1" == "j1" ]; then
@@ -129,7 +131,7 @@ rm -rf out/
 #更新所有文件的时间戳为系统时间
 find . -exec touch -h {} +
 
-make $MAKE_ARGS ${TARGET_DEVICE}_defconfig
+make LD="$set_LD" HOSTLD="$set_HOSTLD" CC="$set_C" CXX="$set_C" HOSTCC="$set_HOSTC" HOSTCXX="$set_HOSTC" $MAKE_ARGS ${TARGET_DEVICE}_defconfig
 
 if [ $KSU_ENABLE -eq 1 ]; then
     scripts/config --file out/.config \
@@ -177,7 +179,7 @@ scripts/config --file out/.config \
     -e CONFIG_KALLSYMS_ALL \
     -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 
-make $MAKE_ARGS -j$(nproc) Image dtbs Image-dtb
+make LD="$set_LD" HOSTLD="$set_HOSTLD" CC="$set_C" CXX="$set_C" HOSTCC="$set_HOSTC" HOSTCXX="$set_HOSTC" $MAKE_ARGS -j$(nproc) Image dtbs Image-dtb
 
 
 
