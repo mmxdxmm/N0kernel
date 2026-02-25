@@ -177,7 +177,7 @@ scripts/config --file out/.config \
     -e CONFIG_KALLSYMS_ALL \
     -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 
-make $MAKE_ARGS -j$(nproc) Image-dtb
+make $MAKE_ARGS -j$(nproc) Image dtbs Image-dtb
 
 
 
