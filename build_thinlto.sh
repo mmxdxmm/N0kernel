@@ -177,7 +177,7 @@ scripts/config --file out/.config \
     -e CONFIG_KALLSYMS_ALL \
     -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 
-make $MAKE_ARGS -j$(nproc) Image dtbs Image-dtb
+make $MAKE_ARGS -j$(nproc)
 
 
 
@@ -188,8 +188,8 @@ else
     exit 1
 fi
 
-#echo "Generating [out/arch/arm64/boot/dtb]......"
-#find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
+echo "Generating [out/arch/arm64/boot/dtb]......"
+find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/dtb
 
 
 
@@ -207,8 +207,8 @@ rm -rf anykernel/dtb
 #    cd -
 #fi
 
-cp out/arch/arm64/boot/Image-dtb anykernel/
-#cp out/arch/arm64/boot/dtb anykernel/
+cp out/arch/arm64/boot/Image anykernel/
+cp out/arch/arm64/boot/dtb anykernel/
 
 echo "Build finished."
 
