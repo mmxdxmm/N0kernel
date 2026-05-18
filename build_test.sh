@@ -133,7 +133,7 @@ make $MAKE_ARGS ${TARGET_DEVICE}_defconfig
 if [ $KSU_ENABLE -eq 1 ]; then
     scripts/config --file out/.config \
     -e KSU \
-    -e CONFIG_KPM
+    -d CONFIG_KPM
 else
     scripts/config --file out/.config -d KSU
 fi
