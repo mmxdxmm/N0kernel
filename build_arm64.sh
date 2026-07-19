@@ -40,8 +40,8 @@ echo "CCACHE_DIR: [$CCACHE_DIR]"
 
 
 MAKE_ARGS="ARCH=arm64 SUBARCH=arm64 O=out LLVM=1 LLVM_IAS=1 AR=llvm-ar NM=llvm-nm STRIP=llvm-strip OBJCOPY=llvm-objcopy OBJDUMP=llvm-objdump HOSTAR=llvm-ar"
-set_C="ccache clang --target=aarch64-linux-gnu -Os -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto=thin -Wno-error -ffunction-sections -fdata-sections"
-set_HOSTC="ccache clang --target=aarch64-linux-gnu -Os -flto=thin -Wno-error -ffunction-sections -fdata-sections"
+set_C="ccache clang --target=aarch64-linux-gnu -O2 -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto=thin -Wno-error -ffunction-sections -fdata-sections"
+set_HOSTC="ccache clang --target=aarch64-linux-gnu -O2 -flto=thin -Wno-error -ffunction-sections -fdata-sections"
 set_LD="ld.lld --strip-debug"
 set_HOSTLD="ld.lld --strip-debug --gc-sections"
 
@@ -178,7 +178,6 @@ find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/d
 
 rm -rf anykernel/Image*
 rm -rf anykernel/dtb
-rm -rf anykernel/dtbo.img
 
 # Patch for SukiSU KPM support. 
 #if [ $KSU_ENABLE -eq 1 ]; then
@@ -193,7 +192,6 @@ rm -rf anykernel/dtbo.img
 
 cp out/arch/arm64/boot/Image anykernel/
 cp out/arch/arm64/boot/dtb anykernel/
-cp out/arch/arm64/boot/dtbo.img anykernel/
 
 echo "Build finished."
 
