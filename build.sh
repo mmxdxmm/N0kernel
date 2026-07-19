@@ -8,7 +8,7 @@ if [ -f "clang.tar.gz" ]; then
     yes | tar -xvf clang.tar.gz -C clang
 else
     echo "文件不存在，正在下载..."
-    wget -nv -O clang.tar.gz "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz"
+    wget -nv -O clang.tar.gz "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main-kernel/clang-r547379.tar.gz"
     if [ $? -eq 0 ]; then
         echo "下载完成，正在解压..."
         yes | tar -xvf clang.tar.gz -C clang
@@ -51,15 +51,15 @@ export PATH="$TOOLCHAIN_PATH:$PATH"
 
 # Enable ccache for speed up compiling 
 export CCACHE_DIR="$HOME/.cache/ccache_mikernel" 
-export CC="ccache clang"
-export CXX="ccache clang++"
+export CC="ccache clang -ffunction-sections -fdata-sections"
+export CXX="ccache clang++ -ffunction-sections -fdata-sections"
 export PATH="/usr/lib/ccache:$PATH"
 echo "CCACHE_DIR: [$CCACHE_DIR]"
 
 
 MAKE_ARGS="ARCH=arm64 SUBARCH=arm64 O=out LLVM=1 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu-"
-CFLAGS="--target=aarch64-linux-musl -Os -ffunction-sections -fdata-sections -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto -Wno-error"
-LDFLAGS="-Wl,--gc-sections"
+CFLAGS="--target=aarch64-linux-musl -O2 -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto=thin -Wno-error"
+LDFLAGS="-Wl,--gc-sections --strip-debug"
 
 
 if [ "$1" == "j1" ]; then
@@ -115,7 +115,7 @@ rm -rf out/
 rm -rf anykernel/
 
 echo "Clone AnyKernel3 for packing kernel (repo: https://github.com/mmxdxmm/AnyKernel3)"
-git clone https://github.com/mmxdxmm/AnyKernel3 -b kona --single-branch --depth=1 anykernel
+git clone https://github.com/mmxdxmm/AnyKernel3 -b main --single-branch --depth=1 anykernel
 
 # Add date to local version
 local_version_str="-N0kernel"
@@ -141,7 +141,7 @@ if [ $KSU_ENABLE -eq 1 ]; then
     -e KSU_SUSFS \
     -e KSU_SUSFS_SUS_OVERLAYFS \
     -e CONFIG_KSU_SUSFS_SUS_SU \
-    -e CONFIG_KPM
+    -d CONFIG_KPM
 else
     scripts/config --file out/.config -d KSU
 fi
@@ -149,10 +149,6 @@ fi
 
 scripts/config --file out/.config \
     -e LTO_CLANG \
-    -e CONFIG_LTO_CLANG_FULL \
-    -d CONFIG_LTO_CLANG_THIN \
-    -d CONFIG_ARCH_SUPPORTS_LTO_CLANG_THIN \
-    -d CONFIG_LTO_NONE \
     -e CONFIG_KALLSYMS_ALL \
     -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 
@@ -172,8 +168,8 @@ find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + >out/arch/arm64/boot/d
 
 
 
-rm -rf anykernel/kernels/
-mkdir -p anykernel/kernels/
+rm -rf anykernel/Image*
+rm -rf anykernel/dtb
 
 # Patch for SukiSU KPM support. 
 #if [ $KSU_ENABLE -eq 1 ]; then
@@ -186,8 +182,8 @@ mkdir -p anykernel/kernels/
 #    cd -
 #fi
 
-cp out/arch/arm64/boot/Image anykernel/kernels/
-cp out/arch/arm64/boot/dtb anykernel/kernels/
+cp out/arch/arm64/boot/Image anykernel/
+cp out/arch/arm64/boot/dtb anykernel/
 
 echo "Build finished."
 
