@@ -1,4 +1,4 @@
-name: Build(lto) Kernel cmi KSU
+name: Build Kernel cmi KSU
 
 on:
   workflow_dispatch:  # Manual trigger only
