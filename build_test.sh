@@ -8,7 +8,7 @@ if [ -f "clang.tar.gz" ]; then
     yes | tar -xvf clang.tar.gz -C clang
 else
     echo "文件不存在，正在下载..."
-    wget -nv -O clang.tar.gz "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main-kernel/clang-r547379.tar.gz"
+    wget -nv -O clang.tar.gz "https://github.com/mmxdxmm/aosp-clang/releases/download/main-kernel/clang-r547379.tar.gz"
     if [ $? -eq 0 ]; then
         echo "下载完成，正在解压..."
         yes | tar -xvf clang.tar.gz -C clang
@@ -16,7 +16,7 @@ else
         echo "下载失败，请检查网络或链接是否正确。"
     fi
 fi
-
+yes | unzip Makefile2.zip
 yes | unzip change.zip
 yes | unzip swappiness.zip
 #yes | tar -xvf electron-binutils-2.41.tar.xz
@@ -58,6 +58,8 @@ echo "CCACHE_DIR: [$CCACHE_DIR]"
 
 
 MAKE_ARGS="ARCH=arm64 SUBARCH=arm64 O=out LLVM=1 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu-"
+CFLAGS="--target=aarch64-linux-musl -O2 -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto=thin -Wno-error"
+LDFLAGS="-Wl,--gc-sections --strip-debug"
 
 
 if [ "$1" == "j1" ]; then
@@ -95,11 +97,12 @@ fi
 
 echo "TARGET_DEVICE: $TARGET_DEVICE"
 
-wget -O setup.sh https://raw.githubusercontent.com/mmxdxmm/SukiSU-Ultra/nogki/kernel/setup.sh && chmod +x setup.sh && bash ./setup.sh --cleanup
+wget -O setup.sh https://raw.githubusercontent.com/mmxdxmm/SukiSU-Ultra/susfs-1.5.5/kernel/setup.sh && bash setup.sh --cleanup
 
 if [ $KSU_ENABLE -eq 1 ]; then
     echo "KSU is enabled"
-    curl -LSs "https://raw.githubusercontent.com/mmxdxmm/SukiSU-Ultra/nogki/kernel/setup.sh" | bash -s nogki
+    yes | unzip susfs-1.5.5.zip
+    curl -LSs "https://raw.githubusercontent.com/mmxdxmm/SukiSU-Ultra/susfs-1.5.5/kernel/setup.sh" | bash -s susfs-1.5.5
     sed -i '/config KSU/,/help/{/select OVERLAY_FS/d}' arch/arm64/Kconfig
 else
     echo "KSU is disabled"
@@ -114,11 +117,12 @@ rm -rf anykernel/
 echo "Clone AnyKernel3 for packing kernel (repo: https://github.com/mmxdxmm/AnyKernel3)"
 git clone https://github.com/mmxdxmm/AnyKernel3 -b main --single-branch --depth=1 anykernel
 
-# 添加内核信息
-#local_version_str="-N0kernel"
-#local_version_date_str="-$(date +%Y%m%d)-${GIT_COMMIT_ID}-N0kernel"
-#sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
-#sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
+# Add date to local version
+local_version_str="-N0kernel"
+local_version_date_str="-$(date +%Y%m%d)-${GIT_COMMIT_ID}-perf"
+
+sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
+sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
 
 # ------------- Building -------------
 
@@ -129,11 +133,14 @@ rm -rf out/
 #更新所有文件的时间戳为系统时间
 find . -exec touch -h {} +
 
-make $MAKE_ARGS ${TARGET_DEVICE}_defconfig
+make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS ${TARGET_DEVICE}_defconfig
 
 if [ $KSU_ENABLE -eq 1 ]; then
     scripts/config --file out/.config \
     -e KSU \
+    -e KSU_SUSFS \
+    -e KSU_SUSFS_SUS_OVERLAYFS \
+    -e CONFIG_KSU_SUSFS_SUS_SU \
     -d CONFIG_KPM
 else
     scripts/config --file out/.config -d KSU
@@ -142,14 +149,35 @@ fi
 
 scripts/config --file out/.config \
     -e LTO_CLANG \
-    -e CONFIG_LTO_CLANG_FULL \
-    -d CONFIG_LTO_CLANG_THIN \
-    -d CONFIG_ARCH_SUPPORTS_LTO_CLANG_THIN \
-    -d CONFIG_LTO_NONE \
     -e CONFIG_KALLSYMS_ALL \
-    -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
+    -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION \
+    -e CONFIG_MODULES \
+    -d CONFIG_KPROBES \
+    -e CONFIG_MODULE_FORCE_LOAD \
+    -e CONFIG_MODULE_UNLOAD \
+    -e CONFIG_MODULE_FORCE_UNLOAD \
+    -d CONFIG_MODVERSIONS \
+    -d CONFIG_MODULE_SRCVERSION_ALL \
+    -d CONFIG_MODULE_SIG \
+    -e CONFIG_MODULE_COMPRESS \
+    -e CONFIG_MODULE_COMPRESS_GZIP \
+    -d CONFIG_MODULE_COMPRESS_XZ \
+    -d CONFIG_TRIM_UNUSED_KSYMS \
+    -d CONFIG_TEST_ASYNC_DRIVER_PROBE \
+    -d CONFIG_MTD_TESTS \
+    -d CONFIG_I2C_STUB \
+    -d CONFIG_SPI_LOOPBACK_TEST \
+    -d CONFIG_RTL8192U \
+    -d CONFIG_RTLLIB \
+    -d CONFIG_RTL8723BS \
+    -d CONFIG_R8188EU \
+    -d CONFIG_88EU_AP_MODE \
+    -d CONFIG_LTE_GDM724X \
+    -d CONFIG_CRYPTO_TEST \
+    -d CONFIG_ARM64_RELOC_TEST \
+    -d CONFIG_LIB80211_DEBUG
 
-make $MAKE_ARGS -j$(nproc)
+make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS -j$(nproc)
 
 
 
@@ -184,8 +212,8 @@ cp out/arch/arm64/boot/dtb anykernel/
 
 echo "Build finished."
 
-# 恢复内核信息
-#sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
+# Restore local version string
+sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
 
 # ------------- End of Building -------------
 

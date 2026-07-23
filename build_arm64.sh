@@ -34,7 +34,7 @@ export PATH="$TOOLCHAIN_PATH:$PATH"
 
 
 # Enable ccache for speed up compiling 
-export CCACHE_DIR="$HOME/.cache/ccache_mikernel"
+export CCACHE_DIR="$HOME/.cache/ccache_mikernel" 
 export PATH="/usr/lib/ccache:$PATH"
 echo "CCACHE_DIR: [$CCACHE_DIR]"
 
@@ -81,7 +81,7 @@ fi
 
 echo "TARGET_DEVICE: $TARGET_DEVICE"
 
-wget -O setup.sh https://raw.githubusercontent.com/mmxdxmm/SukiSU-Ultra/susfs-1.5.5/kernel/setup.sh && bash setup.sh --cleanup
+wget -O setup.sh https://raw.githubusercontent.com/mmxdxmm/SukiSU-Ultra/susfs-1.5.7/kernel/setup.sh && bash setup.sh --cleanup
 
 if [ $KSU_ENABLE -eq 1 ]; then
     echo "KSU is enabled"
@@ -101,11 +101,12 @@ rm -rf anykernel/
 echo "Clone AnyKernel3 for packing kernel (repo: https://github.com/mmxdxmm/AnyKernel3)"
 git clone https://github.com/mmxdxmm/AnyKernel3 -b main --single-branch --depth=1 anykernel
 
-# 添加内核信息
-#local_version_str="-N0kernel"
-#local_version_date_str="-$(date +%Y%m%d)-${GIT_COMMIT_ID}-N0kernel"
-#sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
-#sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
+# Add date to local version
+local_version_str="-N0kernel"
+local_version_date_str="-$(date +%Y%m%d)-${GIT_COMMIT_ID}-perf"
+
+sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
+sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
 
 
 # ------------- Building -------------
@@ -125,7 +126,7 @@ if [ $KSU_ENABLE -eq 1 ]; then
     -e KSU_SUSFS \
     -e KSU_SUSFS_SUS_OVERLAYFS \
     -e CONFIG_KSU_SUSFS_SUS_SU \
-    -e CONFIG_KPM
+    -d CONFIG_KPM
 else
     scripts/config --file out/.config -d KSU
 fi
@@ -133,32 +134,8 @@ fi
 
 scripts/config --file out/.config \
     -e LTO_CLANG \
-    -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION \
-    -e CONFIG_MODULES \
-    -d CONFIG_KPROBES \
-    -e CONFIG_MODULE_FORCE_LOAD \
-    -e CONFIG_MODULE_UNLOAD \
-    -e CONFIG_MODULE_FORCE_UNLOAD \
-    -d CONFIG_MODVERSIONS \
-    -d CONFIG_MODULE_SRCVERSION_ALL \
-    -d CONFIG_MODULE_SIG \
-    -e CONFIG_MODULE_COMPRESS \
-    -e CONFIG_MODULE_COMPRESS_GZIP \
-    -d CONFIG_MODULE_COMPRESS_XZ \
-    -d CONFIG_TRIM_UNUSED_KSYMS \
-    -d CONFIG_TEST_ASYNC_DRIVER_PROBE \
-    -d CONFIG_MTD_TESTS \
-    -d CONFIG_I2C_STUB \
-    -d CONFIG_SPI_LOOPBACK_TEST \
-    -d CONFIG_RTL8192U \
-    -d CONFIG_RTLLIB \
-    -d CONFIG_RTL8723BS \
-    -d CONFIG_R8188EU \
-    -d CONFIG_88EU_AP_MODE \
-    -d CONFIG_LTE_GDM724X \
-    -d CONFIG_CRYPTO_TEST \
-    -d CONFIG_ARM64_RELOC_TEST \
-    -d CONFIG_LIB80211_DEBUG
+    -e CONFIG_KALLSYMS_ALL \
+    -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 
 make LD="$set_LD" HOSTLD="$set_HOSTLD" CC="$set_C" CXX="$set_C" HOSTCC="$set_HOSTC" HOSTCXX="$set_HOSTC" $MAKE_ARGS -j$(nproc)
 
@@ -195,8 +172,8 @@ cp out/arch/arm64/boot/dtb anykernel/
 
 echo "Build finished."
 
-# 恢复内核信息
-#sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
+# Restore local version string
+sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
 
 # ------------- End of Building -------------
 

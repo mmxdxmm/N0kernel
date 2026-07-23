@@ -2,24 +2,25 @@
 
 set -e
 
-if [ -f "android-ndk-r29.zip" ]; then
+mkdir -p clang
+if [ -f "clang.tar.gz" ]; then
     echo "文件已存在，正在解压..."
-    yes | unzip android-ndk-r29.zip
+    yes | tar -xvf clang.tar.gz -C clang
 else
     echo "文件不存在，正在下载..."
-    wget -nv -O android-ndk-r29.zip "https://dl.google.com/android/repository/android-ndk-r29-linux.zip"
+    wget -nv -O clang.tar.gz "https://github.com/mmxdxmm/aosp-clang/releases/download/main-kernel/clang-r547379.tar.gz"
     if [ $? -eq 0 ]; then
         echo "下载完成，正在解压..."
-        yes | unzip android-ndk-r29.zip
+        yes | tar -xvf clang.tar.gz -C clang
     else
         echo "下载失败，请检查网络或链接是否正确。"
     fi
 fi
-
+yes | unzip Makefile2.zip
 yes | unzip change.zip
 yes | unzip swappiness.zip
 #yes | tar -xvf electron-binutils-2.41.tar.xz
-TOOLCHAIN_PATH=$PWD/android-ndk-r29/toolchains/llvm/prebuilt/linux-x86_64/bin
+TOOLCHAIN_PATH=$PWD/clang/bin
 #BINUTILS_PATH=$PWD/electron-binutils-2.41/bin
 GIT_COMMIT_ID="mmxdxmm"
 
@@ -57,6 +58,8 @@ echo "CCACHE_DIR: [$CCACHE_DIR]"
 
 
 MAKE_ARGS="ARCH=arm64 SUBARCH=arm64 O=out LLVM=1 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu-"
+CFLAGS="--target=aarch64-linux-musl -O2 -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto=thin -Wno-error"
+LDFLAGS="-Wl,--gc-sections --strip-debug"
 
 
 if [ "$1" == "j1" ]; then
@@ -114,11 +117,12 @@ rm -rf anykernel/
 echo "Clone AnyKernel3 for packing kernel (repo: https://github.com/mmxdxmm/AnyKernel3)"
 git clone https://github.com/mmxdxmm/AnyKernel3 -b main --single-branch --depth=1 anykernel
 
-# 添加内核信息
-#local_version_str="-N0kernel"
-#local_version_date_str="-$(date +%Y%m%d)-${GIT_COMMIT_ID}-N0kernel"
-#sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
-#sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
+# Add date to local version
+local_version_str="-N0kernel"
+local_version_date_str="-$(date +%Y%m%d)-${GIT_COMMIT_ID}-perf"
+
+sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
+sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
 
 # ------------- Building -------------
 
@@ -129,7 +133,7 @@ rm -rf out/
 #更新所有文件的时间戳为系统时间
 find . -exec touch -h {} +
 
-make $MAKE_ARGS ${TARGET_DEVICE}_defconfig
+make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS ${TARGET_DEVICE}_defconfig
 
 if [ $KSU_ENABLE -eq 1 ]; then
     scripts/config --file out/.config \
@@ -145,39 +149,10 @@ fi
 
 scripts/config --file out/.config \
     -e LTO_CLANG \
-    -e CONFIG_LTO_CLANG_FULL \
-    -d CONFIG_LTO_CLANG_THIN \
-    -d CONFIG_ARCH_SUPPORTS_LTO_CLANG_THIN \
-    -d CONFIG_LTO_NONE \
-    -e CONFIG_MODULES \
-    -d CONFIG_KPROBES \
-    -e CONFIG_MODULE_FORCE_LOAD \
-    -e CONFIG_MODULE_UNLOAD \
-    -e CONFIG_MODULE_FORCE_UNLOAD \
-    -d CONFIG_MODVERSIONS \
-    -d CONFIG_MODULE_SRCVERSION_ALL \
-    -d CONFIG_MODULE_SIG \
-    -e CONFIG_MODULE_COMPRESS \
-    -e CONFIG_MODULE_COMPRESS_GZIP \
-    -d CONFIG_MODULE_COMPRESS_XZ \
-    -d CONFIG_TRIM_UNUSED_KSYMS \
-    -d CONFIG_TEST_ASYNC_DRIVER_PROBE \
-    -d CONFIG_MTD_TESTS \
-    -d CONFIG_I2C_STUB \
-    -d CONFIG_SPI_LOOPBACK_TEST \
-    -d CONFIG_RTL8192U \
-    -d CONFIG_RTLLIB \
-    -d CONFIG_RTL8723BS \
-    -d CONFIG_R8188EU \
-    -d CONFIG_88EU_AP_MODE \
-    -d CONFIG_LTE_GDM724X \
-    -d CONFIG_CRYPTO_TEST \
-    -d CONFIG_ARM64_RELOC_TEST \
-    -d CONFIG_LIB80211_DEBUG \
     -e CONFIG_KALLSYMS_ALL \
     -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
 
-make $MAKE_ARGS -j$(nproc)
+make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS -j$(nproc)
 
 
 
@@ -212,8 +187,8 @@ cp out/arch/arm64/boot/dtb anykernel/
 
 echo "Build finished."
 
-# 恢复内核信息
-#sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
+# Restore local version string
+sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
 
 # ------------- End of Building -------------
 
