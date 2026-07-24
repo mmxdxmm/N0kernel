@@ -87,7 +87,6 @@ if [ $KSU_ENABLE -eq 1 ]; then
     echo "KSU is enabled"
     yes | unzip susfs-1.5.5.zip
     curl -LSs "https://raw.githubusercontent.com/mmxdxmm/SukiSU-Ultra/susfs-1.5.5/kernel/setup.sh" | bash -s susfs-1.5.5
-    yes | unzip ksu_change.zip
     sed -i '/config KSU/,/help/{/select OVERLAY_FS/d}' arch/arm64/Kconfig
 else
     echo "KSU is disabled"
