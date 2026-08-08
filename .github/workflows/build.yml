@@ -34,5 +34,5 @@ jobs:
           name: origin.n0kernel_build-output
           path: |
             out.txt
-            N0kernel_*
+            origin.N0kernel_*
             config.txt
