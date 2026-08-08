@@ -85,7 +85,6 @@ wget -O setup.sh https://raw.githubusercontent.com/mmxdxmm/SukiSU-Ultra/susfs-1.
 
 if [ $KSU_ENABLE -eq 1 ]; then
     echo "KSU is enabled"
-    yes | unzip susfs-1.5.5.zip
     curl -LSs "https://raw.githubusercontent.com/mmxdxmm/SukiSU-Ultra/susfs-1.5.5/kernel/setup.sh" | bash -s susfs-1.5.5
     yes | unzip ksu_change.zip
     sed -i '/config KSU/,/help/{/select OVERLAY_FS/d}' arch/arm64/Kconfig
@@ -124,9 +123,9 @@ make LD="$set_LD" HOSTLD="$set_HOSTLD" CC="$set_C" CXX="$set_C" HOSTCC="$set_HOS
 if [ $KSU_ENABLE -eq 1 ]; then
     scripts/config --file out/.config \
     -e KSU \
-    -e KSU_SUSFS \
-    -e KSU_SUSFS_SUS_OVERLAYFS \
-    -e CONFIG_KSU_SUSFS_SUS_SU \
+    -d KSU_SUSFS \
+    -d KSU_SUSFS_SUS_OVERLAYFS \
+    -d CONFIG_KSU_SUSFS_SUS_SU \
     -d CONFIG_KPM
 else
     scripts/config --file out/.config -d KSU
@@ -181,7 +180,7 @@ sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/$
 
 cd anykernel 
 
-ZIP_FILENAME=N0kernel_${TARGET_DEVICE}_${KSU_ZIP_STR}_$(date +'%Y%m%d_%H%M%S')_anykernel3_${GIT_COMMIT_ID}.zip
+ZIP_FILENAME=origin.N0kernel_${TARGET_DEVICE}_${KSU_ZIP_STR}_$(date +'%Y%m%d_%H%M%S')_anykernel3_${GIT_COMMIT_ID}.zip
 
 zip -r9 $ZIP_FILENAME ./* -x .git .gitignore out/ ./*.zip
 
