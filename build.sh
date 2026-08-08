@@ -141,6 +141,7 @@ if [ $KSU_ENABLE -eq 1 ]; then
     -d KSU_SUSFS \
     -d KSU_SUSFS_SUS_OVERLAYFS \
     -d CONFIG_KSU_SUSFS_SUS_SU \
+    -d CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT \
     -d CONFIG_KPM
 else
     scripts/config --file out/.config -d KSU
