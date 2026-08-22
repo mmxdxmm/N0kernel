@@ -97,10 +97,11 @@ fi
 
 echo "TARGET_DEVICE: $TARGET_DEVICE"
 
-wget -O setup.sh https://raw.githubusercontent.com/mmxdxmm/SukiSU-Ultra/susfs-1.5.5/kernel/setup.sh && chmod +x setup.sh && bash ./setup.sh --cleanup
+wget -O setup.sh https://raw.githubusercontent.com/mmxdxmm/SukiSU-Ultra/susfs-1.5.5/kernel/setup.sh && bash setup.sh --cleanup
 
 if [ $KSU_ENABLE -eq 1 ]; then
     echo "KSU is enabled"
+    yes | unzip susfs-1.5.5.zip
     curl -LSs "https://raw.githubusercontent.com/mmxdxmm/SukiSU-Ultra/susfs-1.5.5/kernel/setup.sh" | bash -s susfs-1.5.5
     yes | unzip ksu_change.zip
     sed -i '/config KSU/,/help/{/select OVERLAY_FS/d}' arch/arm64/Kconfig
@@ -138,10 +139,9 @@ make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS ${TARGET_
 if [ $KSU_ENABLE -eq 1 ]; then
     scripts/config --file out/.config \
     -e KSU \
-    -d KSU_SUSFS \
-    -d KSU_SUSFS_SUS_OVERLAYFS \
-    -d CONFIG_KSU_SUSFS_SUS_SU \
-    -d CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT \
+    -e KSU_SUSFS \
+    -e KSU_SUSFS_SUS_OVERLAYFS \
+    -e CONFIG_KSU_SUSFS_SUS_SU \
     -d CONFIG_KPM
 else
     scripts/config --file out/.config -d KSU
@@ -151,7 +151,32 @@ fi
 scripts/config --file out/.config \
     -e LTO_CLANG \
     -e CONFIG_KALLSYMS_ALL \
-    -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION
+    -e CONFIG_LD_DEAD_CODE_DATA_ELIMINATION \
+    -e CONFIG_MODULES \
+    -d CONFIG_KPROBES \
+    -e CONFIG_MODULE_FORCE_LOAD \
+    -e CONFIG_MODULE_UNLOAD \
+    -e CONFIG_MODULE_FORCE_UNLOAD \
+    -d CONFIG_MODVERSIONS \
+    -d CONFIG_MODULE_SRCVERSION_ALL \
+    -d CONFIG_MODULE_SIG \
+    -e CONFIG_MODULE_COMPRESS \
+    -e CONFIG_MODULE_COMPRESS_GZIP \
+    -d CONFIG_MODULE_COMPRESS_XZ \
+    -d CONFIG_TRIM_UNUSED_KSYMS \
+    -d CONFIG_TEST_ASYNC_DRIVER_PROBE \
+    -d CONFIG_MTD_TESTS \
+    -d CONFIG_I2C_STUB \
+    -d CONFIG_SPI_LOOPBACK_TEST \
+    -d CONFIG_RTL8192U \
+    -d CONFIG_RTLLIB \
+    -d CONFIG_RTL8723BS \
+    -d CONFIG_R8188EU \
+    -d CONFIG_88EU_AP_MODE \
+    -d CONFIG_LTE_GDM724X \
+    -d CONFIG_CRYPTO_TEST \
+    -d CONFIG_ARM64_RELOC_TEST \
+    -d CONFIG_LIB80211_DEBUG
 
 make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS -j$(nproc)
 
@@ -196,7 +221,7 @@ sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/$
 
 cd anykernel 
 
-ZIP_FILENAME=origin.N0kernel_${TARGET_DEVICE}_${KSU_ZIP_STR}_$(date +'%Y%m%d_%H%M%S')_anykernel3_${GIT_COMMIT_ID}.zip
+ZIP_FILENAME=N0kernel_${TARGET_DEVICE}_SUSFS_${KSU_ZIP_STR}_$(date +'%Y%m%d_%H%M%S')_anykernel3_${GIT_COMMIT_ID}.zip
 
 zip -r9 $ZIP_FILENAME ./* -x .git .gitignore out/ ./*.zip
 

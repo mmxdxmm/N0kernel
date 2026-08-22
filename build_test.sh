@@ -17,7 +17,7 @@ else
     fi
 fi
 yes | unzip Makefile2.zip
-yes | unzip change.zip
+yes | unzip change2.zip
 yes | unzip swappiness.zip
 #yes | tar -xvf electron-binutils-2.41.tar.xz
 TOOLCHAIN_PATH=$PWD/clang/bin
@@ -198,15 +198,15 @@ rm -rf anykernel/Image*
 rm -rf anykernel/dtb
 
 # Patch for SukiSU KPM support. 
-#if [ $KSU_ENABLE -eq 1 ]; then
-#    cd out/arch/arm64/boot/
-#    wget https://github.com/mmxdxmm/SukiSU_KernelPatch_patch/releases/download/v0.12.0/patch_linux
-#    chmod +x patch_linux
-#    ./patch_linux
-#    rm Image
-#    mv oImage Image
-#    cd -
-#fi
+if [ $KSU_ENABLE -eq 1 ]; then
+    cd out/arch/arm64/boot/
+    wget https://github.com/mmxdxmm/SukiSU_KernelPatch_patch/releases/download/v0.12.0/patch_linux
+    chmod +x patch_linux
+    ./patch_linux
+    rm Image
+    mv oImage Image
+    cd -
+fi
 
 cp out/arch/arm64/boot/Image anykernel/
 cp out/arch/arm64/boot/dtb anykernel/
