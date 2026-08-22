@@ -142,7 +142,7 @@ if [ $KSU_ENABLE -eq 1 ]; then
     -e KSU_SUSFS \
     -e KSU_SUSFS_SUS_OVERLAYFS \
     -e CONFIG_KSU_SUSFS_SUS_SU \
-    -d CONFIG_KPM
+    -e CONFIG_KPM
 else
     scripts/config --file out/.config -d KSU
 fi
@@ -176,7 +176,9 @@ scripts/config --file out/.config \
     -d CONFIG_LTE_GDM724X \
     -d CONFIG_CRYPTO_TEST \
     -d CONFIG_ARM64_RELOC_TEST \
-    -d CONFIG_LIB80211_DEBUG
+    -d CONFIG_LIB80211_DEBUG \
+    -d CONFIG_KALLSYMS_BASE_RELATIVE \
+    -e CONFIG_KALLSYMS_ABSOLUTE_PERCPU
 
 make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS -j$(nproc)
 
