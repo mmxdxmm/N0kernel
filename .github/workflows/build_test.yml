@@ -27,6 +27,7 @@ jobs:
         run: |
           bash build_test.sh cmi ksu | tee out.txt
           [ -f out/.config ] && cp out/.config config.txt
+          [ -f out/System.map ] && cp out/System.map System.map
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
