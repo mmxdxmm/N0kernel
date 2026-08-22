@@ -25,14 +25,15 @@ jobs:
 
       - name: Build Kernel
         run: |
-          bash build_test.sh cmi ksu > out.txt
+          bash build_test.sh cmi ksu | tee out.txt
           [ -f out/.config ] && cp out/.config config.txt
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: susfs.n0kernel_build-output
+          name: test.n0kernel_build-output
           path: |
             out.txt
             N0kernel_*
             config.txt
+            System.map
