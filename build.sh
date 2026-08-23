@@ -2,20 +2,28 @@
 
 set -e
 
-mkdir -p clang
-if [ -f "clang.tar.gz" ]; then
-    echo "文件已存在，正在解压..."
-    yes | tar -xvf clang.tar.gz -C clang
+# 编译工具链接
+URL="https://github.com/mmxdxmm/aosp-clang/releases/download/main-kernel/clang-r547379.tar.gz"
+ARCHIVE="clang.tar.gz"
+TARGET_DIR="clang"
+# 确保解压目标目录存在
+mkdir -p "$TARGET_DIR"
+# 逻辑判断：如果文件存在，直接跳过；不存在则下载并解压
+if [ -f "$ARCHIVE" ]; then
+    echo "提示：$ARCHIVE 已存在，跳过下载与解压。"
 else
     echo "文件不存在，正在下载..."
-    wget -nv -O clang.tar.gz "https://github.com/mmxdxmm/aosp-clang/releases/download/main-kernel/clang-r547379.tar.gz"
-    if [ $? -eq 0 ]; then
-        echo "下载完成，正在解压..."
-        yes | tar -xvf clang.tar.gz -C clang
+    if wget -nv -O "$ARCHIVE" "$URL"; then
+        echo "下载完成，正在静默解压..."
+        tar -xf "$ARCHIVE" -C "$TARGET_DIR"
+        echo "解压完成！"
     else
-        echo "下载失败，请检查网络或链接是否正确。"
+        echo "错误：下载失败，请检查网络或链接是否正确。"
+        rm -f "$ARCHIVE"
+        exit 1
     fi
 fi
+
 yes | unzip Makefile2.zip
 yes | unzip change.zip
 yes | unzip swappiness.zip
@@ -58,7 +66,7 @@ echo "CCACHE_DIR: [$CCACHE_DIR]"
 
 
 MAKE_ARGS="ARCH=arm64 SUBARCH=arm64 O=out LLVM=1 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- CROSS_COMPILE_COMPAT=arm-linux-gnueabi- CLANG_TRIPLE=aarch64-linux-gnu-"
-CFLAGS="--target=aarch64-linux-musl -O2 -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto=thin -Wno-error"
+CFLAGS="--target=aarch64-linux-gnu -O2 -march=armv8.2-a+lse+crypto+dotprod -mcpu=cortex-a77 -flto=thin -Wno-error"
 LDFLAGS="-Wl,--gc-sections --strip-debug"
 
 
@@ -200,7 +208,7 @@ rm -rf anykernel/dtb
 # Patch for SukiSU KPM support. 
 #if [ $KSU_ENABLE -eq 1 ]; then
 #    cd out/arch/arm64/boot/
-#    wget https://github.com/mmxdxmm/SukiSU_KernelPatch_patch/releases/download/v0.12.0/patch_linux
+#    wget -nv -O patch_linux "https://github.com/mmxdxmm/SukiSU_KernelPatch_patch/releases/download/v0.12.0/patch_linux"
 #    chmod +x patch_linux
 #    ./patch_linux
 #    rm Image
