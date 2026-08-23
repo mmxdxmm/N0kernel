@@ -25,7 +25,7 @@ jobs:
 
       - name: Build Kernel
         run: |
-          bash build_test.sh cmi ksu | tee out.txt
+          bash build_test.sh cmi ksu 2>&1 | tee out.txt | grep --line-buffered -iE "error|warning|fatal|fail"
           [ -f out/.config ] && cp out/.config config.txt
           [ -f out/System.map ] && cp out/System.map System.map
 
