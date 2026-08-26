@@ -25,7 +25,7 @@ else
 fi
 
 yes | unzip Makefile2.zip
-yes | unzip change.zip
+yes | unzip change2.zip
 yes | unzip swappiness.zip
 #yes | tar -xvf electron-binutils-2.41.tar.xz
 TOOLCHAIN_PATH=$PWD/clang/bin
@@ -184,7 +184,14 @@ scripts/config --file out/.config \
     -d CONFIG_LTE_GDM724X \
     -d CONFIG_CRYPTO_TEST \
     -d CONFIG_ARM64_RELOC_TEST \
-    -d CONFIG_LIB80211_DEBUG
+    -d CONFIG_LIB80211_DEBUG \
+    -e CONFIG_ZRAM_BACKEND_LZ4KD \
+    -e CONFIG_ZRAM_BACKEND_LZ4K_OPLUS \
+    -e CONFIG_CRYPTO_LZ4KD \
+    -e CONFIG_CRYPTO_LZ4K_OPLUS \
+    -e CONFIG_LZ4KD_COMPRESS \
+    -e CONFIG_LZ4KD_DECOMPRESS
+    
 
 make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS -j$(nproc)
 
