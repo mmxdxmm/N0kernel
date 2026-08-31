@@ -26,7 +26,6 @@ fi
 
 yes | unzip Makefile2.zip
 yes | unzip change2.zip
-yes | unzip swappiness.zip
 #yes | tar -xvf electron-binutils-2.41.tar.xz
 TOOLCHAIN_PATH=$PWD/clang/bin
 #BINUTILS_PATH=$PWD/electron-binutils-2.41/bin
@@ -192,7 +191,9 @@ scripts/config --file out/.config \
     -e CONFIG_LZ4KD_COMPRESS \
     -e CONFIG_LZ4KD_DECOMPRESS \
     -e CONFIG_ZRAM_BACKEND_ZMAKO \
-    -e CONFIG_ZRAM_BACKEND_ZMAKO_H
+    -e CONFIG_ZRAM_BACKEND_ZMAKO_H \
+    -e CONFIG_KSM \
+    -e CONFIG_UKSM
     
 
 make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS -j$(nproc)

@@ -25,8 +25,7 @@ else
 fi
 
 yes | unzip Makefile2.zip
-yes | unzip change.zip
-yes | unzip swappiness.zip
+yes | unzip change2.zip
 #yes | tar -xvf electron-binutils-2.41.tar.xz
 TOOLCHAIN_PATH=$PWD/clang/bin
 #BINUTILS_PATH=$PWD/electron-binutils-2.41/bin
