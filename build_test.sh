@@ -141,6 +141,9 @@ rm -rf out/
 #更新所有文件的时间戳为系统时间
 find . -exec touch -h {} +
 
+#检测编译器定义的crc宏
+echo | clang -march=armv8.2-a+crc -dM -E - | grep CRC32
+
 make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS ${TARGET_DEVICE}_defconfig
 
 if [ $KSU_ENABLE -eq 1 ]; then
