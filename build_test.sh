@@ -142,7 +142,7 @@ rm -rf out/
 find . -exec touch -h {} +
 
 #检测编译器定义的crc宏
-echo | clang -march=armv8.2-a+crc -dM -E - | grep CRC32
+echo | clang --target=aarch64-linux-gnu -march=armv8.2-a+crc -dM -E - | grep CRC32
 
 make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS ${TARGET_DEVICE}_defconfig
 
