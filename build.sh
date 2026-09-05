@@ -232,7 +232,7 @@ cp out/arch/arm64/boot/dtb anykernel/
 echo "Build finished."
 
 # Restore local version string
-sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
+#sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
 
 # ------------- End of Building -------------
 
