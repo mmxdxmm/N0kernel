@@ -126,8 +126,8 @@ echo "Clone AnyKernel3 for packing kernel (repo: https://github.com/mmxdxmm/AnyK
 git clone https://github.com/mmxdxmm/AnyKernel3 -b main --single-branch --depth=1 anykernel
 
 # Add date to local version
-local_version_str="-N0kernel"
-local_version_date_str="-$(date +%Y%m%d)-${GIT_COMMIT_ID}-perf"
+#local_version_str="-N0kernel"
+#local_version_date_str="-$(date +%Y%m%d)-${GIT_COMMIT_ID}-perf"
 
 sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
 sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
@@ -140,9 +140,6 @@ rm -rf out/
 
 #更新所有文件的时间戳为系统时间
 find . -exec touch -h {} +
-
-#检测编译器定义的crc宏
-echo | clang --target=aarch64-linux-gnu -march=armv8.2-a+crc -dM -E - | grep CRC32
 
 make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS ${TARGET_DEVICE}_defconfig
 
