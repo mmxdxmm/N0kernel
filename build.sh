@@ -129,8 +129,8 @@ git clone https://github.com/mmxdxmm/AnyKernel3 -b main --single-branch --depth=
 #local_version_str="-N0kernel"
 #local_version_date_str="-$(date +%Y%m%d)-${GIT_COMMIT_ID}-perf"
 
-sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
-sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
+#sed -i "s/${local_version_date_str}/${local_version_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
+#sed -i "s/${local_version_str}/${local_version_date_str}/g" arch/arm64/configs/${TARGET_DEVICE}_defconfig
 
 # ------------- Building -------------
 
