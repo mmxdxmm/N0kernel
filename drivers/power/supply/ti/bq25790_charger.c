@@ -1569,7 +1569,6 @@ static int bq25790_update_charging_profile(struct bq25790 *bq)
 
 static int bq25790_psy_register(struct bq25790 *bq)
 {
-	int ret;
 	struct power_supply_config bbc_psy_cfg = {};
 
 	bq->bbc_psy_d.name = "bbc";
@@ -1588,7 +1587,7 @@ static int bq25790_psy_register(struct bq25790 *bq)
 	if (IS_ERR(bq->bbc_psy)) {
 		bq_dbg(PR_OEM, "couldn't register battery psy, ret = %ld\n",
 		       PTR_ERR(bq->bbc_psy));
-		return ret;
+		return (int)PTR_ERR(bq->bbc_psy);
 	}
 
 	return 0;

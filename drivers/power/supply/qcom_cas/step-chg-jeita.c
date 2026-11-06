@@ -948,7 +948,7 @@ static int handle_jeita(struct step_chg_info *chip)
 	int rc = 0, fcc_ua = 0, fv_uv = 0, temp = 0;
 	int volt_now = 0, cold_fcc_ua = 0, cold_index, last_index;
 	u64 elapsed_us;
-	int curr_vbat_uv, cell_vbat_uv;
+	int curr_vbat_uv = 0, cell_vbat_uv = 0;
 
 	rc = power_supply_get_property(chip->batt_psy,
 		POWER_SUPPLY_PROP_SW_JEITA_ENABLED, &pval);

@@ -1000,7 +1000,7 @@ static int
 idtp9229_set_reverse_boost_enable_gpio(struct idtp9220_device_info *di,
 				       int enable)
 {
-	int ret;
+	int ret = 0;
 	if (gpio_is_valid(di->dt_props.reverse_boost_enable_gpio)) {
 		ret = gpio_request(di->dt_props.reverse_boost_enable_gpio,
 				   "reverse-boost-enable-gpio");
@@ -1030,7 +1030,7 @@ idtp9229_set_reverse_boost_enable_gpio(struct idtp9220_device_info *di,
 static int idtp9220_set_reverse_gpio(struct idtp9220_device_info *di,
 				     int enable)
 {
-	int ret;
+	int ret = 0;
 	union power_supply_propval val = {
 		0,
 	};

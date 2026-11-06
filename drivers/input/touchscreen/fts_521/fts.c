@@ -7507,9 +7507,6 @@ static int fts_probe(struct spi_device *client)
 	int retval;
 	int skip_5_1 = 0;
 	u16 bus_type;
-#ifdef CONFIG_TOUCHSCREEN_COMMON
-	int ret;
-#endif
 
 	MI_TOUCH_LOGI(1, "%s %s: Probe start\n", tag, __func__);
 

@@ -654,7 +654,7 @@ static int fg_get_fastcharge_mode(struct bq_fg_chip *bq)
 
 static int fg_set_fastcharge_mode(struct bq_fg_chip *bq, bool enable)
 {
-	int ret;
+	int ret = 0;
 
 	bq->fast_mode = enable;
 

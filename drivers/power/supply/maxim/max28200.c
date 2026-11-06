@@ -676,7 +676,7 @@ static int max28200_program(struct max28200_chip *chip, u8 *image,
 
 static bool max28200_set_watchdog_enable(struct max28200_chip *max, bool enable)
 {
-	int rc;
+	int rc = 0;
 
 	if (max->use_pin_en) {
 		if (enable) {

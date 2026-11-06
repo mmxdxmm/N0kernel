@@ -2805,7 +2805,7 @@ static void smb1398_irev_process_work(struct work_struct *work)
 	int rc;
 	union power_supply_propval pval = {0};
 	long vbus_uv, vbat_uv;
-	int rx_off;
+	int rx_off = 0;
 
 	if (is_for_wireless_charging(chip)) {
 		if (!chip->usb_psy) {
@@ -2837,10 +2837,10 @@ static void smb1398_irev_process_work(struct work_struct *work)
 		}
 
 		vbat_uv = pval.intval;
-		dev_err(chip->dev, "vbat_uv=%d, vbus_uv:%d, rx_off:%d\n", vbat_uv, vbus_uv, rx_off);
 		if (vbus_uv > 0) {
 			rx_off = vbus_uv < vbat_uv ? true : false;
 		}
+		dev_err(chip->dev, "vbat_uv=%ld, vbus_uv:%ld, rx_off:%d\n", vbat_uv, vbus_uv, rx_off);
 		if (rx_off) {
 			if (!chip->wls_psy) {
 				chip->wls_psy = power_supply_get_by_name("wireless");
@@ -3764,7 +3764,7 @@ static int smb1398_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, chip);
 
 	chip->standalone_mode = true;
-	chip->div2_cp_role = (int)of_device_get_match_data(chip->dev);
+	chip->div2_cp_role = (u32)(unsigned long)of_device_get_match_data(chip->dev);
 	switch (chip->div2_cp_role) {
 	case DIV2_CP_MASTER:
 		rc = smb1398_div2_cp_master_probe(chip);
