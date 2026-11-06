@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       ksu:
-        description: '启用 KSU（默认关闭，未验证；需自行集成 KernelSU 源码）'
+        description: '启用 KSU（默认关闭；自动拉取 SukiSU-Ultra/susfs-1.5.5 并应用 ksu_change.zip 修复安装应用卡死）'
         required: false
         type: boolean
         default: false

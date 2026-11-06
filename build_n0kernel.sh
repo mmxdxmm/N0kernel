@@ -3,10 +3,11 @@
 #
 # 与旧 build.sh / build_test.sh 的关键差异：
 #   - 不再 unzip Makefile2.zip/change2.zip：自定义文件已固化进仓库，解压会抹掉 A/B/C/D 的全部修复
-#   - 不再 wget setup.sh --cleanup：该远端脚本无条件执行且会污染源码
+#   - 不再 wget setup.sh --cleanup：该远端脚本无条件执行且会污染源码；KSU 集成改为本脚本内可控流程
 #   - AnyKernel3 克隆分支 main -> master（仓库默认分支为 master）
-#   - KSU 默认关闭（scripts/config -d KSU），仅 --ksu 时开启 config 开关（未验证）
-#   - 支持 cas / cmi 双设备；每个设备编译后立即把产物另存 build_out/$DEVICE/
+#   - KSU 默认关闭（scripts/config -d KSU）；--ksu 时完整集成 SukiSU-Ultra(susfs-1.5.5)，
+#     并强制用 ksu_change.zip 覆盖 throne_tracker.c（修「安装新应用卡死」）
+#   - 支持 cas / cmi 双设备；每个设备编译后立即把产物另存 build_out/$DEVICE/（KSU 版另存 *_ksu/）
 #   - 打包用仓库内 anykernel-$DEVICE/（含定制 anykernel.sh + C 的运行时开关）
 #
 # 用法:
@@ -14,6 +15,7 @@
 # 详见 usage()。
 
 set -e
+set -o pipefail
 
 ROOT=$PWD
 KERNEL_TAG=${KERNEL_TAG:-20260908}
@@ -30,8 +32,9 @@ usage() {
   all          一次编译 cas + cmi（每个设备编译后立即另存 build_out/$DEVICE/）
 
 选项:
-  --ksu        启用 KSU（默认关闭；未验证，需自行集成 KernelSU 源码）
-  --pack-only  仅用 build_out/$DEVICE/ 已有 Image+dtb 打包刷机 zip（不编译）
+  --ksu        启用 KSU：拉取 SukiSU-Ultra(susfs-1.5.5) + susfs-1.5.5.zip 补丁 +
+               ksu_change.zip 覆盖 throne_tracker.c（默认关闭；产物另存 *_ksu/）
+  --pack-only  仅用 build_out/ 下已有 Image+dtb 打包刷机 zip（不编译）
   --local-ak3  跳过 AnyKernel3 clone，直接用仓库内置 anykernel-$DEVICE/ 模板
   -h/--help    显示本帮助
 
@@ -42,6 +45,7 @@ usage() {
 示例:
   bash build_n0kernel.sh cas
   bash build_n0kernel.sh all
+  bash build_n0kernel.sh cmi --ksu
   OUT_DIR=/workspace bash build_n0kernel.sh all --pack-only --local-ak3
 EOF
 }
@@ -63,6 +67,10 @@ case "$DEVICE_ARG" in
   all)     DEVICES="cas cmi";;
   *) echo "未知设备: $DEVICE_ARG"; usage; exit 1;;
 esac
+
+# KSU 版产物与刷机包独立命名/独立目录，绝不覆盖无 KSU 版本
+OUT_SUFFIX=""
+[ "$KSU" = "1" ] && OUT_SUFFIX="_ksu"
 
 # ---------- 工具链：clang/bin/clang 已存在则跳过；否则从 clang.tar.gz 解压 ----------
 if [ "$PACK_ONLY" = "1" ]; then
@@ -134,10 +142,95 @@ apply_config_extras() {
     -e CONFIG_UKSM
 }
 
-# ---------- KSU 开关（默认关闭；--ksu 仅写 config，不执行任何远端脚本/覆盖包）----------
+# ---------- KSU 集成（--ksu 时）----------
+# 为什么必须覆盖 ksu_change.zip：
+#   上游 SukiSU-Ultra 的 KernelSU/kernel/throne_tracker.c 在 iterate_dir() 的
+#   actor 回调（持目录锁、GFP_ATOMIC 上下文）里直接调用 kern_path()/vfs_getattr()，
+#   二者是可能睡眠的 VFS 操作。安装新应用时 KSU 的 throne_tracker 线程扫描
+#   /data/user_de 会与 installd 的目录操作死锁，表现为「安装新应用卡死」。
+#   补丁把包名先存进链表，等 iterate_dir 返回、filp_close 之后再统一做路径查找。
+#   该补丁必须在拉取 KSU 源码「之后」覆盖，否则会被上游源码冲掉。
+KSU_OVERLAY_LIST="$ROOT/.ksu_overlay_files"
+KSU_BASELINE="$ROOT/.ksu_baseline_modified"
+KSU_NOW="$ROOT/.ksu_now_modified"
+KSU_REPO="mmxdxmm/SukiSU-Ultra"
+
+clone_ksu() {
+  local URL=$1
+  rm -rf "$ROOT/KernelSU"
+  if git clone --depth=1 --branch susfs-1.5.5 "$URL" "$ROOT/KernelSU" 2>/dev/null; then
+    return 0
+  fi
+  rm -rf "$ROOT/KernelSU"
+  if git clone --depth=1 "$URL" "$ROOT/KernelSU" 2>/dev/null; then
+    git -C "$ROOT/KernelSU" checkout susfs-1.5.5 2>/dev/null && return 0
+  fi
+  return 1
+}
+
+setup_ksu() {
+  echo "[KSU] 集成 $KSU_REPO (susfs-1.5.5)"
+  # 记录集成前已修改的已跟踪文件：cleanup 时只还原「集成期间新产生」的改动，
+  # 不碰用户在编译前自己的未提交改动（例如刚改过的本脚本）。
+  git -C "$ROOT" diff --name-only 2>/dev/null | sort > "$KSU_BASELINE" || : > "$KSU_BASELINE"
+  # 1) KSU 源码；仓库自带软链 drivers/kernelsu -> ../KernelSU/kernel，补齐即可生效
+  if [ ! -f "$ROOT/KernelSU/kernel/Kconfig" ]; then
+    clone_ksu "https://github.com/${KSU_REPO}.git" || \
+      clone_ksu "https://ghfast.top/https://github.com/${KSU_REPO}.git" || {
+        echo "[KSU] KSU 源码拉取失败，无法继续（无 KSU 版本请用不带 --ksu 的构建）"; exit 1; }
+  fi
+  [ -f "$ROOT/KernelSU/kernel/Kconfig" ] || { echo "[KSU] KernelSU/kernel 不完整"; exit 1; }
+  # 2) Kconfig / Makefile（幂等；Makefile 已被改为 obj-$(CONFIG_KSU) += kernelsu/）
+  grep -q 'drivers/kernelsu/Kconfig' "$ROOT/drivers/Kconfig" || \
+    sed -i "/endmenu/i\source \"drivers/kernelsu/Kconfig\"" "$ROOT/drivers/Kconfig"
+  grep -q 'kernelsu/' "$ROOT/drivers/Makefile" || \
+    printf '\nobj-$(CONFIG_KSU) += kernelsu/\n' >> "$ROOT/drivers/Makefile"
+  # 3) SUSFS 内核侧补丁；记录覆盖清单以便编译后还原源码工作区
+  unzip -Z1 "$ROOT/susfs-1.5.5.zip" | grep -v '/$' > "$KSU_OVERLAY_LIST"
+  unzip -o -q "$ROOT/susfs-1.5.5.zip" -d "$ROOT"
+  # 4) 关键：覆盖 throne_tracker.c，修复「安装新应用卡死」
+  unzip -o -q "$ROOT/ksu_change.zip" -d "$ROOT"
+  grep -q "pkg_name_node" "$ROOT/KernelSU/kernel/throne_tracker.c" || {
+    echo "[KSU] ksu_change.zip 未生效（throne_tracker.c 仍是上游版），拒绝编译"; exit 1; }
+  echo "[KSU] throne_tracker.c 已应用 VFS 死锁修复"
+  # 5) 旧脚本同款：去掉 KSU 对 OVERLAY_FS 的 select，避免与本机 overlayfs 冲突
+  sed -i '/config KSU/,/help/{/select OVERLAY_FS/d}' "$ROOT/arch/arm64/Kconfig"
+}
+
+cleanup_ksu() {
+  echo "[KSU] 还原集成期的临时改动（保持源码仓库干净）"
+  sed -i '/source "drivers\/kernelsu\/Kconfig"/d' "$ROOT/drivers/Kconfig" 2>/dev/null || true
+  if git -C "$ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$ROOT" checkout -- arch/arm64/Kconfig drivers/Makefile 2>/dev/null || true
+    # 兜底：还原集成期间「新产生」的已跟踪文件改动。
+    # KSU 构建除 susfs zip 覆盖外，还会自动给 fs/internal.h 加 path_umount() 声明
+    # （4.19 未导出该函数，KSU 需要），这类文件不在 zip 清单里，必须靠 diff 基线兜住。
+    git -C "$ROOT" diff --name-only 2>/dev/null | sort > "$KSU_NOW" || : > "$KSU_NOW"
+    [ -f "$KSU_BASELINE" ] || : > "$KSU_BASELINE"
+    comm -23 "$KSU_NOW" "$KSU_BASELINE" 2>/dev/null | while IFS= read -r f; do
+      [ -z "$f" ] && continue
+      git -C "$ROOT" checkout -- "$f" 2>/dev/null || true
+    done
+    if [ -f "$KSU_OVERLAY_LIST" ]; then
+      while IFS= read -r f; do
+        [ -z "$f" ] && continue
+        if git -C "$ROOT" ls-files --error-unmatch "$f" >/dev/null 2>&1; then
+          git -C "$ROOT" checkout -- "$f" 2>/dev/null || true
+        else
+          rm -f "$ROOT/$f"
+        fi
+      done < "$KSU_OVERLAY_LIST"
+    fi
+  else
+    echo "[KSU] 警告：当前目录不是 git 仓库，susfs 覆盖的文件无法自动还原，请手动检查"
+  fi
+  rm -f "$KSU_OVERLAY_LIST" "$KSU_BASELINE" "$KSU_NOW"
+  rm -rf "$ROOT/KernelSU"
+  mkdir -p "$ROOT/KernelSU"   # 保留 tarball 自带空目录；软链保持悬空但 CONFIG_KSU=n 时无害
+}
+
 apply_ksu_switch() {
   if [ "$KSU" = "1" ]; then
-    echo "[KSU] 已启用（未验证）：仅写 config 开关，需自行集成 KernelSU 源码，否则 drivers/kernelsu 为空目录会失败"
     scripts/config --file out/.config \
       -e KSU \
       -e KSU_SUSFS \
@@ -153,7 +246,8 @@ apply_ksu_switch() {
 pack_device() {
   local DEVICE=$1
   local STAGE="$ROOT/anykernel"
-  local OUTNAME="N0kernel_${DEVICE}_${KERNEL_TAG}_anykernel3.zip"
+  local SRCDIR="$ROOT/build_out/${DEVICE}${OUT_SUFFIX}"
+  local OUTNAME="N0kernel_${DEVICE}${OUT_SUFFIX}_${KERNEL_TAG}_anykernel3.zip"
   echo "[pack:$DEVICE] 准备 AnyKernel3 目录"
   rm -rf "$STAGE"
   if [ "$LOCAL_AK3" = "1" ]; then
@@ -170,18 +264,24 @@ pack_device() {
   cp -a "$ROOT/anykernel-$DEVICE/." "$STAGE/"
   rm -rf "$STAGE/.git"
   # 拷贝该设备已编译好的内核产物
-  cp "$ROOT/build_out/$DEVICE/Image" "$STAGE/Image"
-  cp "$ROOT/build_out/$DEVICE/dtb"   "$STAGE/dtb"
+  cp "$SRCDIR/Image" "$STAGE/Image"
+  cp "$SRCDIR/dtb"   "$STAGE/dtb"
   mkdir -p "$OUT_DIR"
   ( cd "$STAGE" && zip -r9 "$OUT_DIR/$OUTNAME" . -x '*.zip' >/dev/null )
   echo "[pack:$DEVICE] 生成 $OUT_DIR/$OUTNAME"
 }
 
 # ---------- 主流程 ----------
+if [ "$KSU" = "1" ] && [ "$PACK_ONLY" != "1" ]; then
+  setup_ksu
+  trap cleanup_ksu EXIT
+fi
+
 for DEVICE in $DEVICES; do
   if [ "$PACK_ONLY" = "1" ]; then
-    [ -f "$ROOT/build_out/$DEVICE/Image" ] && [ -f "$ROOT/build_out/$DEVICE/dtb" ] || {
-      echo "缺少 $DEVICE 产物（build_out/$DEVICE/Image 或 dtb）"; exit 1; }
+    [ -f "$ROOT/build_out/${DEVICE}${OUT_SUFFIX}/Image" ] && \
+      [ -f "$ROOT/build_out/${DEVICE}${OUT_SUFFIX}/dtb" ] || {
+      echo "缺少 $DEVICE 产物（build_out/${DEVICE}${OUT_SUFFIX}/Image 或 dtb）"; exit 1; }
     pack_device "$DEVICE"
     continue
   fi
@@ -198,11 +298,11 @@ for DEVICE in $DEVICES; do
   find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + > out/arch/arm64/boot/dtb
 
   # 立即另存（下个设备会 rm -rf out/，避免覆盖第一个设备产物）
-  mkdir -p "build_out/$DEVICE"
-  cp out/arch/arm64/boot/Image "build_out/$DEVICE/Image"
-  cp out/arch/arm64/boot/dtb   "build_out/$DEVICE/dtb"
-  cp out/.config               "build_out/$DEVICE/.config"
-  cp out/System.map            "build_out/$DEVICE/System.map"
+  mkdir -p "build_out/${DEVICE}${OUT_SUFFIX}"
+  cp out/arch/arm64/boot/Image "build_out/${DEVICE}${OUT_SUFFIX}/Image"
+  cp out/arch/arm64/boot/dtb   "build_out/${DEVICE}${OUT_SUFFIX}/dtb"
+  cp out/.config               "build_out/${DEVICE}${OUT_SUFFIX}/.config"
+  cp out/System.map            "build_out/${DEVICE}${OUT_SUFFIX}/System.map"
 
   pack_device "$DEVICE"
 done
