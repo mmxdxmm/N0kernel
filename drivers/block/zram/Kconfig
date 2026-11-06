@@ -26,6 +26,21 @@ config ZRAM_BACKEND_LZ4HC
 	select LZ4HC_COMPRESS
 	select LZ4_DECOMPRESS
 
+config ZRAM_BACKEND_LZ4K
+	bool "lz4k compression support"
+	depends on ZRAM
+	select CRYPTO_LZ4K
+
+config ZRAM_BACKEND_LZ4K_OPLUS
+	bool "lz4k_oplus compression support"
+	depends on ZRAM
+	select CRYPTO_LZ4K_OPLUS
+
+config ZRAM_BACKEND_LZ4KD
+	bool "lz4kd compression support"
+	depends on ZRAM
+	select CRYPTO_LZ4KD
+
 config ZRAM_BACKEND_ZSTD
 	bool "zstd compression support"
 	depends on ZRAM
@@ -43,12 +58,27 @@ config ZRAM_BACKEND_842
 	depends on ZRAM
 	select 842_COMPRESS
 	select 842_DECOMPRESS
+	
+config ZRAM_BACKEND_ZMAKO
+	bool "zmako backend"
+	depends on ZRAM
+	help
+	  Enable the ultra-fast Zero-overhead Memory-Aligned Kompressor (Z-Mako) 
+	  specifically designed for Android memory workloads.
+
+config ZRAM_BACKEND_ZMAKO_H
+	bool "zmako_h backend"
+	depends on ZRAM
+	help
+	  A highly compressed version of zmako algorithm.
 
 config ZRAM_BACKEND_FORCE_LZO
 	depends on ZRAM
 	def_bool !ZRAM_BACKEND_LZ4 && !ZRAM_BACKEND_LZ4HC && \
-		!ZRAM_BACKEND_ZSTD && !ZRAM_BACKEND_DEFLATE && \
-		!ZRAM_BACKEND_842
+		!ZRAM_BACKEND_LZ4K && !ZRAM_BACKEND_LZ4K_OPLUS && \
+		!ZRAM_BACKEND_LZ4KD && !ZRAM_BACKEND_ZSTD && \
+		!ZRAM_BACKEND_DEFLATE && !ZRAM_BACKEND_842 && \
+		!ZRAM_BACKEND_ZMAKO && !ZRAM_BACKEND_ZMAKO_H
 
 config ZRAM_BACKEND_LZO
 	bool "lzo and lzo-rle compression support" if !ZRAM_BACKEND_FORCE_LZO
@@ -78,6 +108,18 @@ config ZRAM_DEF_COMP_LZ4HC
 	bool "lz4hc"
 	depends on ZRAM_BACKEND_LZ4HC
 
+config ZRAM_DEF_COMP_LZ4K
+	bool "lz4k"
+	depends on ZRAM_BACKEND_LZ4K
+
+config ZRAM_DEF_COMP_LZ4K_OPLUS
+	bool "lz4k_oplus"
+	depends on ZRAM_BACKEND_LZ4K_OPLUS
+
+config ZRAM_DEF_COMP_LZ4KD
+	bool "lz4kd"
+	depends on ZRAM_BACKEND_LZ4KD
+
 config ZRAM_DEF_COMP_ZSTD
 	bool "zstd"
 	depends on ZRAM_BACKEND_ZSTD
@@ -90,6 +132,14 @@ config ZRAM_DEF_COMP_842
 	bool "842"
 	depends on ZRAM_BACKEND_842
 
+config ZRAM_DEF_COMP_ZMAKO
+	bool "zmako"
+	depends on ZRAM_BACKEND_ZMAKO
+
+config ZRAM_DEF_COMP_ZMAKO_H
+	bool "zmako_h"
+	depends on ZRAM_BACKEND_ZMAKO_H
+
 endchoice
 
 config ZRAM_DEF_COMP
@@ -99,9 +149,14 @@ config ZRAM_DEF_COMP
 	default "lzo" if ZRAM_DEF_COMP_LZO
 	default "lz4" if ZRAM_DEF_COMP_LZ4
 	default "lz4hc" if ZRAM_DEF_COMP_LZ4HC
+	default "lz4k" if ZRAM_DEF_COMP_LZ4K
+	default "lz4k_oplus" if ZRAM_DEF_COMP_LZ4K_OPLUS
+	default "lz4kd" if ZRAM_DEF_COMP_LZ4KD
 	default "zstd" if ZRAM_DEF_COMP_ZSTD
 	default "deflate" if ZRAM_DEF_COMP_DEFLATE
 	default "842" if ZRAM_DEF_COMP_842
+	default "zmako" if ZRAM_DEF_COMP_ZMAKO
+	default "zmako_h" if ZRAM_DEF_COMP_ZMAKO_H
 	default "unset-value"
 
 config ZRAM_WRITEBACK

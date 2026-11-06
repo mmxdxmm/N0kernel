@@ -1165,6 +1165,9 @@ const char * const vmstat_text[] = {
 	"nr_vmscan_immediate_reclaim",
 	"nr_dirtied",
 	"nr_written",
+#ifdef CONFIG_UKSM
+	"nr_uksm_zero_pages",
+#endif
 	"nr_kernel_misc_reclaimable",
 	"nr_unreclaimable_pages",
 

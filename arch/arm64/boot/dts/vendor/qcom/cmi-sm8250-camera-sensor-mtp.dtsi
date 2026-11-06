@@ -59,7 +59,7 @@
 		regulator-name = "camera_wide_vana_ldo";
 		regulator-min-microvolt = <2800000>;
 		regulator-max-microvolt = <2800000>;
-		regulator-enable-ramp-delay = <135>;
+		regulator-enable-ramp-delay = <2000>;
 		enable-active-high;
 		gpio = <&pm8150l_gpios 1 0>;
 		vin-supply = <&pm8150a_bob>;
@@ -71,7 +71,7 @@
 		regulator-name = "camera_ultra_wide_vana_ldo";
 		regulator-min-microvolt = <2800000>;
 		regulator-max-microvolt = <2800000>;
-		regulator-enable-ramp-delay = <135>;
+		regulator-enable-ramp-delay = <2000>;
 		enable-active-high;
 		gpio = <&pm8150l_gpios 3 0>;
 		vin-supply = <&pm8150a_bob>;
@@ -83,7 +83,7 @@
 		regulator-name = "camera_tele_vana_ldo";
 		regulator-min-microvolt = <2800000>;
 		regulator-max-microvolt = <2800000>;
-		regulator-enable-ramp-delay = <135>;
+		regulator-enable-ramp-delay = <2000>;
 		enable-active-high;
 		gpio = <&pm8150l_gpios 4 0>;
 		vin-supply = <&pm8150a_bob>;
@@ -95,7 +95,7 @@
 		regulator-name = "camera_tele_vdig_ldo";
 		regulator-min-microvolt = <1200000>;
 		regulator-max-microvolt = <1200000>;
-		regulator-enable-ramp-delay = <135>;
+		regulator-enable-ramp-delay = <2000>;
 		enable-active-high;
 		gpio = <&pm8009_gpios 1 0>;
 		vin-supply = <&pm8150a_s8>;
@@ -107,7 +107,7 @@
 		regulator-name = "camera_macro_vana_ldo";
 		regulator-min-microvolt = <2800000>;
 		regulator-max-microvolt = <2800000>;
-		regulator-enable-ramp-delay = <135>;
+		regulator-enable-ramp-delay = <2000>;
 		enable-active-high;
 		gpio = <&pm8150l_gpios 5 0>;
 		vin-supply = <&pm8150a_bob>;
@@ -119,13 +119,14 @@
 		regulator-name = "camera_tele_reset_ldo";
 		regulator-min-microvolt = <1800000>;
 		regulator-max-microvolt = <1800000>;
-		regulator-enable-ramp-delay = <135>;
+		regulator-enable-ramp-delay = <2000>;
 		enable-active-high;
 		gpio = <&pm8009_gpios 2 0>;
 	};
 };
 
 &cam_cci0 {
+	clock-frequency = <100000>;
 	qcom,cam-res-mgr {
 		compatible = "qcom,cam-res-mgr";
 		status = "ok";
@@ -325,7 +326,7 @@
 		pwm-switch;
 		rgltr-min-voltage = <1800000 2800000 1104000 2850000 0>;
 		rgltr-max-voltage = <1800000 2800000 1104000 2850000 0>;
-		rgltr-load-current = <120000 80000 1200000 100000 0>;
+		rgltr-load-current = <300000 80000 1200000 100000 0>;
 		gpio-no-mux = <0>;
 		pinctrl-names = "cam_default", "cam_suspend";
 		pinctrl-0 = <&cam0_reset_default>;
@@ -367,7 +368,7 @@
 		pwm-switch;
 		rgltr-min-voltage = <1800000 2800000 1104000 0>;
 		rgltr-max-voltage = <1800000 2800000 1104000 0>;
-		rgltr-load-current = <120000 2000000 120000 0>;
+		rgltr-load-current = <300000 2000000 120000 0>;
 		gpio-no-mux = <0>;
 		pinctrl-names = "cam_default", "cam_suspend";
 		pinctrl-0 = <&cam_sensor_mclk1_active
@@ -435,6 +436,7 @@
 };
 
 &cam_cci1 {
+	clock-frequency = <100000>;
 	/*  J1 macro actuator */
 	actuator_cmi_macro: qcom,actuator@3 {
 		cell-index = <3>;
@@ -577,7 +579,7 @@
 		pwm-switch;
 		rgltr-min-voltage = <1800000 2800000 1104000 0>;
 		rgltr-max-voltage = <1800000 2800000 1104000 0>;
-		rgltr-load-current = <120000 80000 120000 0>;
+		rgltr-load-current = <300000 80000 120000 0>;
 		gpio-no-mux = <0>;
 		pinctrl-names = "cam_default", "cam_suspend";
 		pinctrl-0 = <&cam_sensor_mclk4_active
@@ -620,7 +622,7 @@
 		rgltr-cntrl-support;
 		rgltr-min-voltage = <1800000 1200000 0 2800000>;
 		rgltr-max-voltage = <1800000 1200000 0 2800000>;
-		rgltr-load-current = <120000 1056000 0 80000>;
+		rgltr-load-current = <300000 1056000 0 80000>;
 		gpio-no-mux = <0>;
 		pinctrl-names = "cam_default", "cam_suspend";
 		pinctrl-0 = <&cam_sensor_mclk3_active
@@ -667,7 +669,7 @@
 		pwm-switch;
 		rgltr-min-voltage = <1800000 2800000 1200000 2850000 0 1800000>;
 		rgltr-max-voltage = <1800000 2800000 1200000 2850000 0 1800000>;
-		rgltr-load-current = <120000 80000 1200000 100000 0 120000>;
+		rgltr-load-current = <300000 80000 150000 100000 0 120000>;
 		gpio-no-mux = <0>;
 		pinctrl-names = "cam_default", "cam_suspend";
 		pinctrl-0 = <&cam_sensor_mclk2_active
@@ -676,9 +678,11 @@
 		pinctrl-1 = <&cam_sensor_mclk2_suspend
 				&cam4_reset_default
 				&cam4_vdig_default>;
-		gpios = <&tlmm 96 0>;
-		gpio-req-tbl-num = <0>;
-		gpio-req-tbl-flags = <1>;
+		gpios = <&tlmm 96 0>,
+			<&pm8009_gpios 2 0>;
+		gpio-reset = <1>;
+		gpio-req-tbl-num = <0 1>;
+		gpio-req-tbl-flags = <1 0>;
 		gpio-req-tbl-label = "CAMIF_MCLK2";
 		sensor-mode = <0>;
 		cci-master = <0>;

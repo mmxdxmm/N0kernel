@@ -20,6 +20,10 @@
 #include "segment.h"
 #include "gc.h"
 
+#include <linux/proc_fs.h>
+
+extern struct proc_dir_entry *f2fs_proc_root;
+
 static LIST_HEAD(f2fs_stat_list);
 static DEFINE_RAW_SPINLOCK(f2fs_stat_lock);
 #ifdef CONFIG_DEBUG_FS
@@ -59,7 +63,6 @@ void f2fs_update_sit_info(struct f2fs_sb_info *sbi)
 		si->avg_vblocks = 0;
 }
 
-#ifdef CONFIG_DEBUG_FS
 static void update_general_status(struct f2fs_sb_info *sbi)
 {
 	struct f2fs_stat_info *si = F2FS_STAT(sbi);
@@ -616,7 +619,6 @@ static int stat_show(struct seq_file *s, void *v)
 }
 
 DEFINE_SHOW_ATTRIBUTE(stat);
-#endif
 
 int f2fs_build_stats(struct f2fs_sb_info *sbi)
 {
@@ -684,18 +686,12 @@ void f2fs_destroy_stats(struct f2fs_sb_info *sbi)
 
 void __init f2fs_create_root_stats(void)
 {
-#ifdef CONFIG_DEBUG_FS
-	f2fs_debugfs_root = debugfs_create_dir("f2fs", NULL);
-
-	debugfs_create_file("status", 0444, f2fs_debugfs_root, NULL,
-			    &stat_fops);
-#endif
+	if (f2fs_proc_root)
+		proc_create_single("status", 0444, f2fs_proc_root, stat_show);
 }
 
 void f2fs_destroy_root_stats(void)
 {
-#ifdef CONFIG_DEBUG_FS
-	debugfs_remove_recursive(f2fs_debugfs_root);
-	f2fs_debugfs_root = NULL;
-#endif
+    if (f2fs_proc_root)
+        remove_proc_entry("status", f2fs_proc_root);
 }

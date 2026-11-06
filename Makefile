@@ -365,10 +365,10 @@ else
 HOSTCC	= gcc
 HOSTCXX	= g++
 endif
-KBUILD_HOSTCFLAGS   := -Wall -Wmissing-prototypes -Wstrict-prototypes -O3 \
+KBUILD_HOSTCFLAGS   := -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 \
 		-fomit-frame-pointer -std=gnu89 -pipe $(HOST_LFS_CFLAGS) \
 		$(HOSTCFLAGS)
-KBUILD_HOSTCXXFLAGS := -O3 $(HOST_LFS_CFLAGS) $(HOSTCXXFLAGS)
+KBUILD_HOSTCXXFLAGS := -O2 $(HOST_LFS_CFLAGS) $(HOSTCXXFLAGS)
 KBUILD_HOSTLDFLAGS  := $(HOST_LFS_LDFLAGS) $(HOSTLDFLAGS)
 KBUILD_HOSTLDLIBS   := $(HOST_LFS_LIBS) $(HOSTLDLIBS)
 
@@ -687,9 +687,9 @@ else ifeq ($(cc-name),clang)
 KBUILD_CFLAGS   += -mllvm -hot-cold-split=true
 # Enable MLGO optimizations for register allocation
 KBUILD_CFLAGS   += -mllvm -regalloc-enable-advisor=release
-KBUILD_CFLAGS   += -O3 -march=armv8.2-a+lse+crypto+dotprod --cuda-path=/dev/null
-KBUILD_AFLAGS   += -O3 -march=armv8.2-a+lse+crypto+dotprod
-KBUILD_LDFLAGS  += -O3 --plugin-opt=O3
+KBUILD_CFLAGS   += -O2 -march=armv8.2-a+lse+crypto+dotprod --cuda-path=/dev/null
+KBUILD_AFLAGS   += -O2 -march=armv8.2-a+lse+crypto+dotprod
+KBUILD_LDFLAGS  += -O2 --plugin-opt=O2
 KBUILD_LDFLAGS  += -mllvm -regalloc-enable-advisor=release
 KBUILD_LDFLAGS  += -mllvm -enable-ml-inliner=release
 else
@@ -802,9 +802,9 @@ endif
 KBUILD_CFLAGS += $(call cc-disable-warning, unused-but-set-variable)
 
 ifdef CONFIG_LTO_CLANG
-KBUILD_LDFLAGS += -O3 --lto-O3 --strip-debug
+KBUILD_LDFLAGS += -O2 --lto-O2 --strip-debug
 else
-KBUILD_LDFLAGS += -O3 --strip-debug
+KBUILD_LDFLAGS += -O2 --strip-debug
 endif
 
 KBUILD_CFLAGS += $(call cc-disable-warning, unused-const-variable)
