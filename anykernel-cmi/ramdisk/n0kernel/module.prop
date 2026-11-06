@@ -1,0 +1,6 @@
+id=n0kernel
+name=N0kernel Runtime Tuner
+version=20260908
+versionCode=20260908
+author=mmxdxmm
+description=zram-first tuning; writeback/swap opt-in (default OFF). Override via persist.n0kernel.* props.

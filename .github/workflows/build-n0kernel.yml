@@ -1,0 +1,48 @@
+name: Build N0kernel (cas / cmi)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ksu:
+        description: '启用 KSU（默认关闭，未验证；需自行集成 KernelSU 源码）'
+        required: false
+        type: boolean
+        default: false
+      local_ak3:
+        description: '跳过 AnyKernel3 clone，用仓库内置 anykernel-<device>/ 模板'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        device: [cas, cmi]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update and Install Dependencies
+        run: |
+          sudo apt update && sudo apt install build-essential git curl wget bison flex zip bc cpio libssl-dev ccache lz4 gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi -y
+
+      - name: Build Kernel (${{ matrix.device }})
+        run: |
+          set -o pipefail
+          ARGS="${{ matrix.device }}"
+          [ "${{ inputs.ksu }}" = "true" ] && ARGS="$ARGS --ksu"
+          [ "${{ inputs.local_ak3 }}" = "true" ] && ARGS="$ARGS --local-ak3"
+          bash build_n0kernel.sh $ARGS 2>&1 | tee build_${{ matrix.device }}.txt
+
+      - name: Upload flashable zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: N0kernel_${{ matrix.device }}_anykernel3
+          path: |
+            N0kernel_${{ matrix.device }}_*_anykernel3.zip
+            build_${{ matrix.device }}.txt
+          if-no-files-found: error
