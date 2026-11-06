@@ -2610,9 +2610,25 @@ static void smblib_check_input_status(struct smb_charger *chg)
 	pr_err("vbat_uv: %d\n", vbat_uv);
 
 	/*
+	 * report_input_absent is cleared only on plug-out, so it remains set
+	 * while the charger stays connected. Once the inserted charger has
+	 * raised vbat back above the cutoff threshold, stop hiding the input;
+	 * otherwise userspace keeps seeing ONLINE=0 / STATUS=DISCHARGING and
+	 * a pending low-battery shutdown can never be cancelled.
+	 */
+	if (chg->report_input_absent
+			&& (input_present & INPUT_PRESENT_DC
+				|| input_present & INPUT_PRESENT_USB)
+			&& (vbat_uv > (CUTOFF_VOL_THR + CUTOFF_VOL_HYS))) {
+		chg->report_input_absent = false;
+		power_supply_changed(chg->batt_psy);
+	}
+
+	/*
 	 * if battery soc is 0%, vbat is below 3400mV and input is present in
 	 * normal mode (not power-off charging mode), set usb/usb_port/dc
-	 * online to false to notify system to power off.
+	 * online to false to notify system to power off. A zero/invalid vbat
+	 * reading must not be treated as a critically low battery.
 	 */
 	if ((input_present & INPUT_PRESENT_DC
 			|| input_present & INPUT_PRESENT_USB)

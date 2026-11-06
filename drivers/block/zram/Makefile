@@ -17,6 +17,6 @@ zram-$(CONFIG_ZRAM_BACKEND_ZMAKO_H) += backend_zmako_h.o
 obj-$(CONFIG_ZRAM)	+=	zram.o
 
 CFLAGS_REMOVE_backend_zmako.o += -mgeneral-regs-only
-CFLAGS_backend_zmako.o += -march=armv8-a+simd
+CFLAGS_backend_zmako.o += -march=armv8-a+simd -Wno-declaration-after-statement -Wno-gcc-compat
 CFLAGS_REMOVE_backend_zmako_h.o += -mgeneral-regs-only
-CFLAGS_backend_zmako_h.o += -march=armv8-a+simd
+CFLAGS_backend_zmako_h.o += -march=armv8-a+simd -Wno-declaration-after-statement -Wno-gcc-compat
