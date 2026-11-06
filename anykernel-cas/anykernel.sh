@@ -30,9 +30,10 @@ set_perm_recursive 0 0 750 750 $RAMDISK/init* $RAMDISK/sbin;
 set_perm_recursive 0 0 755 755 $RAMDISK/n0kernel;
 } # end attributes
 
-# boot shell variables (sm8250 / A-B slot / boot by-name)
+# boot shell variables (sm8250 / boot by-name)
+# auto: 检测不到 slot 时按 A-only 处理，避免硬编码 1 在无 slot 设备上直接 abort
 BLOCK=/dev/block/bootdevice/by-name/boot;
-IS_SLOT_DEVICE=1;
+IS_SLOT_DEVICE=auto;
 RAMDISK_COMPRESSION=auto;
 PATCH_VBMETA_FLAG=auto;
 

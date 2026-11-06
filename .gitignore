@@ -86,6 +86,13 @@ modules.builtin
 !.mailmap
 !.cocciconfig
 !.clang-format
+# N0kernel: 保留仓库元数据与 GitHub 工作流（否则 .* 规则会把它们全部忽略）
+!.gitmodules
+!.gitattributes
+!.get_maintainer.ignore
+!.github/
+!.github/workflows/
+!.github/workflows/*.yml
 
 #
 # Generated include files
