@@ -3,19 +3,28 @@ name: Build N0kernel (cas / cmi)
 on:
   workflow_dispatch:
     inputs:
-      ksu:
-        description: '启用 KSU（默认关闭；自动拉取 SukiSU-Ultra/susfs-1.5.5 并应用 ksu_change.zip 修复安装应用卡死）'
+      variant:
+        description: 'standard=无 KSU；sukisu-ultra=集成 SukiSU-Ultra(susfs-1.5.5) 并应用 ksu_change.zip 安装应用卡死修复；all=两者都编'
         required: false
-        type: boolean
-        default: false
+        type: choice
+        default: all
+        options:
+          - all
+          - standard
+          - sukisu-ultra
       local_ak3:
-        description: '跳过 AnyKernel3 clone，用仓库内置 anykernel-<device>/ 模板'
+        description: '跳过 AnyKernel3 clone，直接用仓库内置 anykernel-<device>/ 模板（离线更稳）'
         required: false
         type: boolean
         default: false
 
+# 两个独立 job：standard（无 KSU）与 sukisu-ultra（带 SukiSU-Ultra）。
+# 拆成 job 而不是单 job 的 variant 矩阵，是因为 GitHub 的 jobs.<id>.if
+# 不允许引用 matrix context；这里 job 级条件只用 inputs，device 矩阵留在各 job 内部。
 jobs:
-  build:
+  standard:
+    name: standard / ${{ matrix.device }}
+    if: ${{ inputs.variant == '' || inputs.variant == 'all' || inputs.variant == 'standard' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -28,21 +37,71 @@ jobs:
 
       - name: Update and Install Dependencies
         run: |
-          sudo apt update && sudo apt install build-essential git curl wget bison flex zip bc cpio libssl-dev ccache lz4 gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi -y
+          sudo apt update
+          sudo apt install -y build-essential git curl wget bison flex zip unzip bc cpio \
+            libssl-dev libelf-dev libncurses-dev ccache lz4 \
+            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
+            u-boot-tools xz-utils zlib1g-dev python3 device-tree-compiler
 
-      - name: Build Kernel (${{ matrix.device }})
+      - name: Build Kernel (${{ matrix.device }} / standard)
         run: |
           set -o pipefail
           ARGS="${{ matrix.device }}"
-          [ "${{ inputs.ksu }}" = "true" ] && ARGS="$ARGS --ksu"
-          [ "${{ inputs.local_ak3 }}" = "true" ] && ARGS="$ARGS --local-ak3"
-          bash build_n0kernel.sh $ARGS 2>&1 | tee build_${{ matrix.device }}.txt
+          if [ "${{ inputs.local_ak3 }}" = "true" ]; then
+            ARGS="$ARGS --local-ak3"
+          fi
+          echo "[CI] bash build_n0kernel.sh $ARGS"
+          bash build_n0kernel.sh $ARGS 2>&1 | tee "build_${{ matrix.device }}_standard.txt"
 
       - name: Upload flashable zip
         uses: actions/upload-artifact@v4
         with:
-          name: N0kernel_${{ matrix.device }}_anykernel3
+          name: N0kernel_${{ matrix.device }}_standard_anykernel3
           path: |
             N0kernel_${{ matrix.device }}_*_anykernel3.zip
-            build_${{ matrix.device }}.txt
+            build_${{ matrix.device }}_standard.txt
+          if-no-files-found: error
+
+  sukisu-ultra:
+    name: sukisu-ultra / ${{ matrix.device }}
+    if: ${{ inputs.variant == '' || inputs.variant == 'all' || inputs.variant == 'sukisu-ultra' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        device: [cas, cmi]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Update and Install Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential git curl wget bison flex zip unzip bc cpio \
+            libssl-dev libelf-dev libncurses-dev ccache lz4 \
+            gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
+            u-boot-tools xz-utils zlib1g-dev python3 device-tree-compiler
+
+      # --ksu 会：拉取 SukiSU-Ultra/susfs-1.5.5 -> 解压 susfs-1.5.5.zip
+      # -> 用 ksu_change.zip 覆盖 throne_tracker.c（修 iterate_dir 里睡眠 VFS 导致的
+      #    「安装新应用卡死」死锁）-> 编译 -> cleanup 还原工作区。
+      # 所需的 susfs-1.5.5.zip / ksu_change.zip 已随仓库提交，CI 无需额外秘钥。
+      - name: Build Kernel (${{ matrix.device }} / sukisu-ultra)
+        run: |
+          set -o pipefail
+          ARGS="${{ matrix.device }} --ksu"
+          if [ "${{ inputs.local_ak3 }}" = "true" ]; then
+            ARGS="$ARGS --local-ak3"
+          fi
+          echo "[CI] bash build_n0kernel.sh $ARGS"
+          bash build_n0kernel.sh $ARGS 2>&1 | tee "build_${{ matrix.device }}_sukisu-ultra.txt"
+
+      - name: Upload flashable zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: N0kernel_${{ matrix.device }}_sukisu-ultra_anykernel3
+          path: |
+            N0kernel_${{ matrix.device }}_*_anykernel3.zip
+            build_${{ matrix.device }}_sukisu-ultra.txt
           if-no-files-found: error
