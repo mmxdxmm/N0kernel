@@ -17,6 +17,11 @@ on:
         required: false
         type: boolean
         default: false
+      kernel_tag:
+        description: '刷机 zip 名中的版本串；留空 = 编译当天日期 YYYYMMDD（如 20261107）'
+        required: false
+        type: string
+        default: ''
 
 # 两个独立 job：standard（无 KSU）与 sukisu-ultra（带 SukiSU-Ultra）。
 # 拆成 job 而不是单 job 的 variant 矩阵，是因为 GitHub 的 jobs.<id>.if
@@ -44,6 +49,8 @@ jobs:
             u-boot-tools xz-utils zlib1g-dev python3 device-tree-compiler
 
       - name: Build Kernel (${{ matrix.device }} / standard)
+        env:
+          KERNEL_TAG: ${{ inputs.kernel_tag }}
         run: |
           set -o pipefail
           ARGS="${{ matrix.device }}"
@@ -88,6 +95,8 @@ jobs:
       #    「安装新应用卡死」死锁）-> 编译 -> cleanup 还原工作区。
       # 所需的 susfs-1.5.5.zip / ksu_change.zip 已随仓库提交，CI 无需额外秘钥。
       - name: Build Kernel (${{ matrix.device }} / sukisu-ultra)
+        env:
+          KERNEL_TAG: ${{ inputs.kernel_tag }}
         run: |
           set -o pipefail
           ARGS="${{ matrix.device }} --ksu"

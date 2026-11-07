@@ -9,6 +9,7 @@
 #     并强制用 ksu_change.zip 覆盖 throne_tracker.c（修「安装新应用卡死」）
 #   - 支持 cas / cmi 双设备；每个设备编译后立即把产物另存 build_out/$DEVICE/（KSU 版另存 *_ksu/）
 #   - 打包用仓库内 anykernel-$DEVICE/（含定制 anykernel.sh + C 的运行时开关）
+#   - zip 名中的版本串默认取编译当天日期 YYYYMMDD（可用 KERNEL_TAG 显式覆盖）
 #
 # 用法:
 #   bash build_n0kernel.sh cas|cmi|all [--ksu] [--pack-only] [--local-ak3]
@@ -18,7 +19,7 @@ set -e
 set -o pipefail
 
 ROOT=$PWD
-KERNEL_TAG=${KERNEL_TAG:-20260908}
+KERNEL_TAG=${KERNEL_TAG:-$(date +%Y%m%d)}
 OUT_DIR=${OUT_DIR:-$ROOT}
 CLANG_URL="https://github.com/mmxdxmm/aosp-clang/releases/download/main-kernel/clang-r547379.tar.gz"
 
@@ -40,7 +41,7 @@ usage() {
 
 环境变量:
   OUT_DIR      刷机 zip 输出目录（默认=仓库根）
-  KERNEL_TAG   zip 名中的版本串（默认 20260908）
+  KERNEL_TAG   zip 名中的版本串（默认=编译当天日期 YYYYMMDD；显式指定可复现旧命名）
 
 示例:
   bash build_n0kernel.sh cas
