@@ -13,16 +13,18 @@ on:
           - standard
           - sukisu-ultra
       local_ak3:
-        description: '跳过 AnyKernel3 clone，直接用仓库内置 anykernel-<device>/ 模板（离线更稳）'
+        description: '跳过 AnyKernel3 clone，直接用仓库内置 anykernel-<device>/ 模板（离线更稳，默认开启）'
         required: false
         type: boolean
-        default: false
+        default: true
       kernel_tag:
         description: '刷机 zip 名中的版本串；留空 = 编译当天日期 YYYYMMDD（如 20261107）'
         required: false
         type: string
         default: ''
 
+# 匹配「已移植内存优化特性」的源码仓库：异步 GC + 默认 lz4 + lz4/zstd 后端。
+# 编译前后由 build_n0kernel.sh 的 verify_memopt_config() 断言配置生效。
 # 两个独立 job：standard（无 KSU）与 sukisu-ultra（带 SukiSU-Ultra）。
 # 拆成 job 而不是单 job 的 variant 矩阵，是因为 GitHub 的 jobs.<id>.if
 # 不允许引用 matrix context；这里 job 级条件只用 inputs，device 矩阵留在各 job 内部。
@@ -46,7 +48,20 @@ jobs:
           sudo apt install -y build-essential git curl wget bison flex zip unzip bc cpio \
             libssl-dev libelf-dev libncurses-dev ccache lz4 \
             gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
-            u-boot-tools xz-utils zlib1g-dev python3 device-tree-compiler
+            u-boot-tools xz-utils zlib1g-dev zstd libzstd-dev python3 python3-yaml \
+            device-tree-compiler
+
+      - name: Verify memory-optimization source (${{ matrix.device }} / standard)
+        run: |
+          set -e
+          python3 -c "import yaml; d=yaml.safe_load(open('.github/workflows/build-n0kernel.yml')); assert 'standard' in d['jobs']"
+          grep -q 'config ZRAM_ASYNC_GC' drivers/block/zram/Kconfig
+          grep -q 'zram_gc_work' drivers/block/zram/zram_drv.c
+          grep -q 'CONFIG_ZRAM_DEF_COMP="lz4"' arch/arm64/configs/${{ matrix.device }}_defconfig
+          grep -q 'verify_memopt_config' build_n0kernel.sh
+          grep -q 'comp_algorithm=lz4' anykernel-${{ matrix.device }}/ramdisk/n0kernel/system.prop
+          grep -Eq '^defprop persist\.n0kernel\.zram\.comp_algorithm[[:space:]]+lz4' anykernel-${{ matrix.device }}/ramdisk/n0kernel/n0kernel-tune.sh
+          echo "[CI] 源码标记校验通过：异步 GC + lz4 默认压缩器 + 运行时脚本 + 脚本配置自检"
 
       - name: Build Kernel (${{ matrix.device }} / standard)
         env:
@@ -67,6 +82,8 @@ jobs:
           path: |
             N0kernel_${{ matrix.device }}_*_anykernel3.zip
             build_${{ matrix.device }}_standard.txt
+            build_${{ matrix.device }}.log
+            build_out/${{ matrix.device }}/.config
           if-no-files-found: error
 
   sukisu-ultra:
@@ -88,12 +105,25 @@ jobs:
           sudo apt install -y build-essential git curl wget bison flex zip unzip bc cpio \
             libssl-dev libelf-dev libncurses-dev ccache lz4 \
             gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi \
-            u-boot-tools xz-utils zlib1g-dev python3 device-tree-compiler
+            u-boot-tools xz-utils zlib1g-dev zstd libzstd-dev python3 python3-yaml \
+            device-tree-compiler
 
       # --ksu 会：拉取 SukiSU-Ultra/susfs-1.5.5 -> 解压 susfs-1.5.5.zip
       # -> 用 ksu_change.zip 覆盖 throne_tracker.c（修 iterate_dir 里睡眠 VFS 导致的
       #    「安装新应用卡死」死锁）-> 编译 -> cleanup 还原工作区。
       # 所需的 susfs-1.5.5.zip / ksu_change.zip 已随仓库提交，CI 无需额外秘钥。
+      - name: Verify memory-optimization source (${{ matrix.device }} / sukisu-ultra)
+        run: |
+          set -e
+          python3 -c "import yaml; d=yaml.safe_load(open('.github/workflows/build-n0kernel.yml')); assert 'sukisu-ultra' in d['jobs']"
+          grep -q 'config ZRAM_ASYNC_GC' drivers/block/zram/Kconfig
+          grep -q 'zram_gc_work' drivers/block/zram/zram_drv.c
+          grep -q 'CONFIG_ZRAM_DEF_COMP="lz4"' arch/arm64/configs/${{ matrix.device }}_defconfig
+          grep -q 'verify_memopt_config' build_n0kernel.sh
+          grep -q 'comp_algorithm=lz4' anykernel-${{ matrix.device }}/ramdisk/n0kernel/system.prop
+          grep -Eq '^defprop persist\.n0kernel\.zram\.comp_algorithm[[:space:]]+lz4' anykernel-${{ matrix.device }}/ramdisk/n0kernel/n0kernel-tune.sh
+          echo "[CI] 源码标记校验通过：异步 GC + lz4 默认压缩器 + 运行时脚本 + 脚本配置自检"
+
       - name: Build Kernel (${{ matrix.device }} / sukisu-ultra)
         env:
           KERNEL_TAG: ${{ inputs.kernel_tag }}
@@ -113,4 +143,6 @@ jobs:
           path: |
             N0kernel_${{ matrix.device }}_*_anykernel3.zip
             build_${{ matrix.device }}_sukisu-ultra.txt
+            build_${{ matrix.device }}_ksu.log
+            build_out/${{ matrix.device }}_ksu/.config
           if-no-files-found: error

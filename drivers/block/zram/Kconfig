@@ -159,6 +159,27 @@ config ZRAM_DEF_COMP
 	default "zmako_h" if ZRAM_DEF_COMP_ZMAKO_H
 	default "unset-value"
 
+config ZRAM_ASYNC_GC
+	bool "Asynchronous GC for lazy zram slot freeing"
+	depends on ZRAM
+	default y
+	help
+	  Defer zram slot freeing (swap_slot_free_notify) to a background
+	  work item instead of doing it synchronously in the swap unmap
+	  path.  This shortens the latency of freeing anonymous folios
+	  during Android low-memory killing on memory-constrained devices.
+
+	  Backport of [RFC PATCH] "zram: support asynchronous GC for lazy
+	  slot freeing" by Barry Song (Xiaomi), 2026-04-12,
+	  Message-Id <20260412060450.15813-1-baohua@kernel.org>.
+	  This is an RFC, NOT a mainline-merged feature; upstream later
+	  evolved the idea into a zsmalloc deferred-free series
+	  ([RFC PATCH v3], 2026-05).  On this 4.19-based tree the driver
+	  helpers are named zram_free_page()/zram_slot_trylock() and the
+	  default workqueue is system_wq instead of system_dfl_wq.
+
+	  Say N to restore the original synchronous slot-free behaviour.
+
 config ZRAM_WRITEBACK
        bool "Write back incompressible or idle page to backing device"
        depends on ZRAM

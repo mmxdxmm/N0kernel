@@ -8,7 +8,9 @@
 
 # 属性默认值兜底：仅当属性未设置时写入（persist 属性，用户 setprop 可覆盖）
 defprop() { [ -n "$(getprop "$1")" ] || setprop "$1" "$2"; }
-defprop persist.n0kernel.zram.comp_algorithm        zmako
+# 默认压缩器统一为 lz4（低压缩/解压延迟、低 CPU 占用，减少前台卡顿）。
+# 可运行时切换：lz4kd / zmako_h / lz4k_oplus / zstd / zmako。
+defprop persist.n0kernel.zram.comp_algorithm        lz4
 defprop persist.n0kernel.zram.writeback             0
 defprop persist.n0kernel.swap.enable                0
 defprop persist.n0kernel.vm.swappiness              100

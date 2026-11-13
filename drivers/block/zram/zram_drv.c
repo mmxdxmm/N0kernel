@@ -32,6 +32,10 @@
 #include <linux/sysfs.h>
 #include <linux/debugfs.h>
 #include <linux/cpuhotplug.h>
+#ifdef CONFIG_ZRAM_ASYNC_GC
+#include <linux/bitmap.h>
+#include <linux/workqueue.h>
+#endif
 
 #include "zram_drv.h"
 
@@ -1505,6 +1509,71 @@ static DEVICE_ATTR_RO(bd_stat);
 #endif
 static DEVICE_ATTR_RO(debug_stat);
 
+#ifdef CONFIG_ZRAM_ASYNC_GC
+/*
+ * Async slot GC -- backport of [RFC PATCH] "zram: support asynchronous GC
+ * for lazy slot freeing" by Barry Song (Xiaomi), 2026-04-12,
+ * Message-Id <20260412060450.15813-1-baohua@kernel.org>.
+ *
+ * The original patch targets mainline 2026, where the helpers are named
+ * slot_free()/slot_trylock()/slot_unlock()/slot_lock_init()/clear_slot_flag()
+ * and the workqueue is system_dfl_wq.  This tree is Linux 4.19.246 with a
+ * mainline-like zram driver backported, but it keeps the 4.19 names
+ * (zram_free_page(), zram_slot_trylock(), zram_slot_unlock(),
+ * zram_slot_lock_init(), zram_clear_flag()) and only has system_wq.
+ * The symbol mapping is applied below.
+ *
+ * NOTE: this is an RFC, NOT a mainline-merged feature.  Upstream later
+ * evolved the idea into a zsmalloc deferred-free series (RFC v3, 2026-05).
+ * Everything is guarded by CONFIG_ZRAM_ASYNC_GC so it can be turned off
+ * with a single config change.
+ *
+ * Known boundaries of this RFC v1 bitmap design (documented rather than
+ * silently "improved" on a device kernel that cannot be runtime-tested
+ * in this build environment):
+ *  - If zram_slot_trylock() fails inside zram_gc_slots_free(), that bit
+ *    is skipped for this pass.  It stays set, with gc_slots still
+ *    accounting for it, until a later >200 wake-up or zram_meta_free().
+ *    This only delays freeing; it never leaks, because zram_meta_free()
+ *    does flush_work() + a full drain before bitmap_free().
+ *  - zram_slot_free_notify() is a swap callback and does not take
+ *    init_lock.  A concurrent notify between flush_work() and
+ *    bitmap_free() is covered by gc_map == NULL checks in every path.
+ *  - RFC v3 replaces the bitmap with zsmalloc deferred-free + per-CPU
+ *    buffers; that needs a newer zsmalloc API than 4.19 provides, so it
+ *    is not applicable to this tree.
+ */
+#define ZRAM_GC_BATCH_WAKEUP	200
+#define ZRAM_GC_DIRECT_LIMIT	30000
+
+static void zram_gc_slots_free(struct zram *zram)
+{
+	size_t num_pages = zram->disksize >> PAGE_SHIFT;
+	unsigned long index;
+
+	if (!zram->gc_map)
+		return;
+
+	index = find_next_bit(zram->gc_map, num_pages, 0);
+	while (index < num_pages) {
+		if (zram_slot_trylock(zram, index)) {
+			if (test_bit(index, zram->gc_map))
+				zram_free_page(zram, index);
+			zram_slot_unlock(zram, index);
+			cond_resched();
+		}
+		index = find_next_bit(zram->gc_map, num_pages, index + 1);
+	}
+}
+
+static void zram_gc_work(struct work_struct *work)
+{
+	struct zram *zram = container_of(work, struct zram, gc_work);
+
+	zram_gc_slots_free(zram);
+}
+#endif /* CONFIG_ZRAM_ASYNC_GC */
+
 static void zram_meta_free(struct zram *zram, u64 disksize)
 {
 	size_t num_pages = disksize >> PAGE_SHIFT;
@@ -1513,6 +1582,19 @@ static void zram_meta_free(struct zram *zram, u64 disksize)
 	if (!zram->table)
 		return;
 
+#ifdef CONFIG_ZRAM_ASYNC_GC
+	/*
+	 * The GC worker dereferences zram->table / mem_pool, so it must be
+	 * stopped and drained before either is torn down.  gc_map is only
+	 * non-NULL after a successful zram_meta_alloc(), which is also where
+	 * gc_work gets INIT_WORK()'d -- hence flushing only when gc_map set.
+	 */
+	if (zram->gc_map) {
+		flush_work(&zram->gc_work);
+		zram_gc_slots_free(zram);
+	}
+#endif
+
 	/* Free all pages that are still in this zram device */
 	for (index = 0; index < num_pages; index++)
 		zram_free_page(zram, index);
@@ -1520,6 +1602,10 @@ static void zram_meta_free(struct zram *zram, u64 disksize)
 	zs_destroy_pool(zram->mem_pool);
 	vfree(zram->table);
 	zram->table = NULL;
+#ifdef CONFIG_ZRAM_ASYNC_GC
+	bitmap_free(zram->gc_map);
+	zram->gc_map = NULL;
+#endif
 }
 
 static bool zram_meta_alloc(struct zram *zram, u64 disksize)
@@ -1541,6 +1627,18 @@ static bool zram_meta_alloc(struct zram *zram, u64 disksize)
 	if (!huge_class_size)
 		huge_class_size = zs_huge_class_size(zram->mem_pool);
 
+#ifdef CONFIG_ZRAM_ASYNC_GC
+	zram->gc_map = bitmap_zalloc((unsigned int)num_pages, GFP_KERNEL);
+	if (!zram->gc_map) {
+		zs_destroy_pool(zram->mem_pool);
+		vfree(zram->table);
+		zram->table = NULL;
+		return false;
+	}
+	atomic64_set(&zram->stats.gc_slots, 0);
+	INIT_WORK(&zram->gc_work, zram_gc_work);
+#endif
+
 	for (index = 0; index < num_pages; index++)
 		zram_slot_lock_init(zram, index);
 
@@ -1550,6 +1648,17 @@ static bool zram_meta_alloc(struct zram *zram, u64 disksize)
 static void zram_free_page(struct zram *zram, size_t index)
 {
 	unsigned long handle;
+
+#ifdef CONFIG_ZRAM_ASYNC_GC
+	/*
+	 * Every free path (GC worker, direct free, write overwrite) goes
+	 * through here.  Clearing the pending bit keeps gc_slots exact and
+	 * prevents the GC worker from freeing a slot that has already been
+	 * reused by a new write after swap_slot_free_notify().
+	 */
+	if (zram->gc_map && test_and_clear_bit(index, zram->gc_map))
+		atomic64_dec(&zram->stats.gc_slots);
+#endif
 
 #ifdef CONFIG_ZRAM_MEMORY_TRACKING
 	zram->table[index].ac_time = 0;
@@ -2354,6 +2463,28 @@ static blk_qc_t zram_make_request(struct request_queue *queue, struct bio *bio)
 	return BLK_QC_T_NONE;
 }
 
+#ifdef CONFIG_ZRAM_ASYNC_GC
+/*
+ * Called with the slot lock held.  On failure the caller frees the slot
+ * synchronously, so a failed trylock never leaves a bit set in gc_map.
+ */
+static bool try_slot_lazy_free(struct zram *zram, unsigned long index)
+{
+	if (!zram->gc_map)
+		return false;
+
+	/* Too many pending lazy-free slots: fall back to direct free. */
+	if (atomic64_read(&zram->stats.gc_slots) > ZRAM_GC_DIRECT_LIMIT)
+		return false;
+	if (test_and_set_bit(index, zram->gc_map))
+		return false;
+	/* Enough accumulated work: wake the GC worker. */
+	if (atomic64_inc_return(&zram->stats.gc_slots) > ZRAM_GC_BATCH_WAKEUP)
+		queue_work(system_wq, &zram->gc_work);
+	return true;
+}
+#endif
+
 static void zram_slot_free_notify(struct block_device *bdev,
 				unsigned long index)
 {
@@ -2367,7 +2498,10 @@ static void zram_slot_free_notify(struct block_device *bdev,
 		return;
 	}
 
-	zram_free_page(zram, index);
+#ifdef CONFIG_ZRAM_ASYNC_GC
+	if (!try_slot_lazy_free(zram, index))
+#endif
+		zram_free_page(zram, index);
 	zram_slot_unlock(zram, index);
 }
 

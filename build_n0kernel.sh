@@ -1,5 +1,5 @@
 #!/bin/bash
-# N0kernel 一键编译脚本（匹配「修复后的源码仓库」）
+# N0kernel 一键编译脚本（匹配「已移植内存优化特性」的源码仓库）
 #
 # 与旧 build.sh / build_test.sh 的关键差异：
 #   - 不再 unzip Makefile2.zip/change2.zip：自定义文件已固化进仓库，解压会抹掉 A/B/C/D 的全部修复
@@ -9,6 +9,8 @@
 #     并强制用 ksu_change.zip 覆盖 throne_tracker.c（修「安装新应用卡死」）
 #   - 支持 cas / cmi 双设备；每个设备编译后立即把产物另存 build_out/$DEVICE/（KSU 版另存 *_ksu/）
 #   - 打包用仓库内 anykernel-$DEVICE/（含定制 anykernel.sh + C 的运行时开关）
+#   - 内存优化联动：默认 zram 压缩器强制 lz4、启用 CONFIG_ZRAM_ASYNC_GC，
+#     编译前后各做一次配置自检（verify_memopt_config），不符即拒绝编译
 #   - zip 名中的版本串默认取编译当天日期 YYYYMMDD（可用 KERNEL_TAG 显式覆盖）
 #
 # 用法:
@@ -22,6 +24,11 @@ ROOT=$PWD
 KERNEL_TAG=${KERNEL_TAG:-$(date +%Y%m%d)}
 OUT_DIR=${OUT_DIR:-$ROOT}
 CLANG_URL="https://github.com/mmxdxmm/aosp-clang/releases/download/main-kernel/clang-r547379.tar.gz"
+# 国内/受限网络走中转（只影响工具链下载，不影响编译产物）：
+#   MIRROR_PREFIX="https://<中转域名>/<你的token>/" bash build_n0kernel.sh cas
+# 也可 CLANG_URL_OVERRIDE=<完整URL> 直接指定；CI（境外）默认直连。
+MIRROR_PREFIX=${MIRROR_PREFIX:-}
+CLANG_URL_OVERRIDE=${CLANG_URL_OVERRIDE:-}
 
 usage() {
   cat <<'EOF'
@@ -40,8 +47,10 @@ usage() {
   -h/--help    显示本帮助
 
 环境变量:
-  OUT_DIR      刷机 zip 输出目录（默认=仓库根）
-  KERNEL_TAG   zip 名中的版本串（默认=编译当天日期 YYYYMMDD；显式指定可复现旧命名）
+  OUT_DIR             刷机 zip 输出目录（默认=仓库根）
+  KERNEL_TAG          zip 名中的版本串（默认=编译当天日期 YYYYMMDD；显式指定可复现旧命名）
+  MIRROR_PREFIX       工具链下载中转前缀，形如 https://<中转域名>/<token>/
+  CLANG_URL_OVERRIDE  直接指定工具链完整下载 URL（优先级高于 MIRROR_PREFIX）
 
 示例:
   bash build_n0kernel.sh cas
@@ -81,12 +90,16 @@ else
     echo "[toolchain] clang/bin/clang 已存在，跳过下载与解压"
   else
     if [ ! -f "$ROOT/clang.tar.gz" ]; then
+      CLANG_DL_URL="${CLANG_URL_OVERRIDE:-${MIRROR_PREFIX}${CLANG_URL}}"
       echo "[toolchain] 下载 clang.tar.gz ..."
-      wget -nv -O clang.tar.gz "$CLANG_URL" || { echo "工具链下载失败"; rm -f clang.tar.gz; exit 1; }
+      echo "[toolchain] URL: $CLANG_DL_URL"
+      wget -c -nv -O clang.tar.gz "$CLANG_DL_URL" || { echo "工具链下载失败"; rm -f clang.tar.gz; exit 1; }
     fi
     echo "[toolchain] 解压 clang.tar.gz -> clang/"
     mkdir -p clang
-    tar -xf clang.tar.gz -C clang
+    # 个别 clang 发行包内含 lldb 目录重命名，tar 会报非致命告警；
+    # 以 clang/bin/clang 是否可执行为最终判据（紧随其后的 -x 检查）。
+    tar -xf clang.tar.gz -C clang || true
   fi
   [ -x "$ROOT/clang/bin/clang" ] || { echo "clang/bin/clang 仍缺失"; exit 1; }
   export PATH="$ROOT/clang/bin:/usr/lib/ccache:$PATH"
@@ -177,7 +190,7 @@ setup_ksu() {
   # 1) KSU 源码；仓库自带软链 drivers/kernelsu -> ../KernelSU/kernel，补齐即可生效
   if [ ! -f "$ROOT/KernelSU/kernel/Kconfig" ]; then
     clone_ksu "https://github.com/${KSU_REPO}.git" || \
-      clone_ksu "https://ghfast.top/https://github.com/${KSU_REPO}.git" || {
+      clone_ksu "${MIRROR_PREFIX}https://github.com/${KSU_REPO}.git" || {
         echo "[KSU] KSU 源码拉取失败，无法继续（无 KSU 版本请用不带 --ksu 的构建）"; exit 1; }
   fi
   [ -f "$ROOT/KernelSU/kernel/Kconfig" ] || { echo "[KSU] KernelSU/kernel 不完整"; exit 1; }
@@ -230,6 +243,82 @@ cleanup_ksu() {
   mkdir -p "$ROOT/KernelSU"   # 保留 tarball 自带空目录；软链保持悬空但 CONFIG_KSU=n 时无害
 }
 
+# ---------- 内存优化特性：配置联动 + 编译前后自检 ----------
+# 本仓库已移植：zram 异步 GC（CONFIG_ZRAM_ASYNC_GC）、默认压缩器 lz4、
+# lz4/zstd 后端。以下函数保证「改了源码也必须真的编进去」。
+apply_memopt_config() {
+  scripts/config --file out/.config \
+    -e CONFIG_ZRAM \
+    -e CONFIG_ZRAM_BACKEND_LZ4 \
+    -e CONFIG_ZRAM_BACKEND_ZSTD \
+    -e CONFIG_ZRAM_ASYNC_GC \
+    -d CONFIG_ZRAM_DEF_COMP_LZORLE \
+    -d CONFIG_ZRAM_DEF_COMP_LZO \
+    -d CONFIG_ZRAM_DEF_COMP_LZ4HC \
+    -d CONFIG_ZRAM_DEF_COMP_LZ4K \
+    -d CONFIG_ZRAM_DEF_COMP_LZ4K_OPLUS \
+    -d CONFIG_ZRAM_DEF_COMP_LZ4KD \
+    -d CONFIG_ZRAM_DEF_COMP_ZSTD \
+    -d CONFIG_ZRAM_DEF_COMP_DEFLATE \
+    -d CONFIG_ZRAM_DEF_COMP_842 \
+    -d CONFIG_ZRAM_DEF_COMP_ZMAKO \
+    -d CONFIG_ZRAM_DEF_COMP_ZMAKO_H \
+    -e CONFIG_ZRAM_DEF_COMP_LZ4 \
+    --set-str CONFIG_ZRAM_DEF_COMP lz4
+}
+
+verify_memopt_config() {
+  local cfg=out/.config
+  local bad=0
+  local line
+  # 自检证据同时落到 build_<device>.log，便于随包追溯
+  vlog() { echo "$@" | tee -a "${BUILD_LOG:-/dev/null}"; }
+  while IFS= read -r line; do
+    case "$line" in ''|'#'*) continue;; esac
+    if ! grep -qxF "$line" "$cfg"; then
+      vlog "[verify] 配置不符: $line"
+      bad=1
+    fi
+  done <<'MEMOPT_CFG'
+CONFIG_ZRAM=y
+CONFIG_ZRAM_ASYNC_GC=y
+CONFIG_ZRAM_BACKEND_LZ4=y
+CONFIG_ZRAM_BACKEND_ZSTD=y
+CONFIG_ZRAM_DEF_COMP_LZ4=y
+CONFIG_ZRAM_DEF_COMP="lz4"
+CONFIG_LZ4_COMPRESS=y
+CONFIG_LZ4_DECOMPRESS=y
+CONFIG_ZSTD_COMPRESS=y
+CONFIG_ZSTD_DECOMPRESS=y
+MEMOPT_CFG
+  if [ "$bad" != "0" ]; then
+    vlog "[verify] 内存优化配置未生效，拒绝继续编译（检查 defconfig / Kconfig / scripts/config）"
+    exit 1
+  fi
+  vlog "[verify] 内存优化配置 OK：zram=lz4, async_gc=y, lz4/zstd 后端已启用"
+}
+
+verify_source_markers() {
+  grep -q 'config ZRAM_ASYNC_GC' drivers/block/zram/Kconfig || {
+    echo "[verify] 源码缺少 CONFIG_ZRAM_ASYNC_GC，疑似拉错分支/旧源码"; exit 1; }
+  grep -q 'zram_gc_work' drivers/block/zram/zram_drv.c || {
+    echo "[verify] 源码缺少 zram 异步 GC 实现"; exit 1; }
+  local d
+  for d in $DEVICES; do
+    grep -q 'CONFIG_ZRAM_DEF_COMP="lz4"' "arch/arm64/configs/${d}_defconfig" || {
+      echo "[verify] ${d}_defconfig 默认压缩器不是 lz4"; exit 1; }
+  done
+  echo "[verify] 源码标记 OK（异步 GC + 双设备 lz4 默认）"
+}
+
+summarize_build_log() {
+  local log=$1
+  [ -f "$log" ] || return 0
+  echo "[build] 日志统计: $log"
+  echo "  error   : $(grep -ciE '(^|[[:space:]])error:|Error [0-9]+' "$log" || true)"
+  echo "  warning : $(grep -ciE '(^|[[:space:]])warning:' "$log" || true)"
+}
+
 apply_ksu_switch() {
   if [ "$KSU" = "1" ]; then
     scripts/config --file out/.config \
@@ -278,6 +367,10 @@ if [ "$KSU" = "1" ] && [ "$PACK_ONLY" != "1" ]; then
   trap cleanup_ksu EXIT
 fi
 
+if [ "$PACK_ONLY" != "1" ]; then
+  verify_source_markers
+fi
+
 for DEVICE in $DEVICES; do
   if [ "$PACK_ONLY" = "1" ]; then
     [ -f "$ROOT/build_out/${DEVICE}${OUT_SUFFIX}/Image" ] && \
@@ -291,10 +384,19 @@ for DEVICE in $DEVICES; do
     echo "缺少 arch/arm64/configs/${DEVICE}_defconfig"; exit 1; }
   echo "===== 编译 $DEVICE (KSU=$KSU) ====="
   rm -rf out/
+  BUILD_LOG="$ROOT/build_${DEVICE}${OUT_SUFFIX}.log"
+  : > "$BUILD_LOG"
   make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS ${DEVICE}_defconfig
   apply_ksu_switch
   apply_config_extras
-  make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS -j$(nproc)
+  apply_memopt_config
+  # 让 Kconfig 收敛后再校验，防止 oldconfig 把 choice 选回 ZMAKO
+  make $MAKE_ARGS olddefconfig
+  verify_memopt_config
+  make CFLAGS="$CFLAGS" CXXFLAGS="$CFLAGS" LDFLAGS="$LDFLAGS" $MAKE_ARGS -j$(nproc) 2>&1 | tee -a "$BUILD_LOG"
+  # 编译后再次校验：确认 make 没有把内存优化配置改回去
+  verify_memopt_config
+  summarize_build_log "$BUILD_LOG"
   [ -f out/arch/arm64/boot/Image ] || { echo "编译失败：未生成 Image"; exit 1; }
   find out/arch/arm64/boot/dts -name '*.dtb' -exec cat {} + > out/arch/arm64/boot/dtb
 

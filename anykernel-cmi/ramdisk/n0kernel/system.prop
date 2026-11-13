@@ -1,8 +1,8 @@
 # N0kernel 运行时开关默认值（stage C 清单，共 11 个主开关）
 # Magisk/KSU 模块加载本文件；无 root 方案时 n0kernel-tune.sh 用 defprop 自行兜底。
 # 修改方式：setprop persist.n0kernel.<key> <value> 后重启，或编辑本文件。
-# zram 压缩器：zmako（最快），可切 lz4kd / zmako_h / lz4k_oplus / lz4
-persist.n0kernel.zram.comp_algorithm=zmako
+# zram 压缩器：lz4（默认，低延迟低 CPU），可切 lz4kd / zmako_h / lz4k_oplus / zstd / zmako
+persist.n0kernel.zram.comp_algorithm=lz4
 # zram 容量：空=沿用 Rom，例 4G / 6G
 persist.n0kernel.zram.disksize=
 # zram 回写总开关：0=关（默认）。=1 且 backing_dev 非空才启用

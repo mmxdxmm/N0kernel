@@ -17,6 +17,9 @@
 
 #include <linux/rwsem.h>
 #include <linux/zsmalloc.h>
+#ifdef CONFIG_ZRAM_ASYNC_GC
+#include <linux/workqueue.h>
+#endif
 
 #include "zcomp.h"
 
@@ -83,6 +86,9 @@ struct zram_stats {
 	atomic64_t pages_stored;	/* no. of pages currently stored */
 	atomic_long_t max_used_pages;	/* no. of maximum pages stored */
 	atomic64_t miss_free;		/* no. of missed free */
+#ifdef	CONFIG_ZRAM_ASYNC_GC
+	atomic64_t gc_slots;		/* no. of slots queued for lazy free by gc */
+#endif
 #ifdef	CONFIG_ZRAM_WRITEBACK
 	atomic64_t bd_count;		/* no. of pages in backing device */
 	atomic64_t bd_reads;		/* no. of reads from backing device */
@@ -138,5 +144,13 @@ struct zram {
 	struct dentry *debugfs_dir;
 #endif
 	atomic_t pp_in_progress;
+#ifdef CONFIG_ZRAM_ASYNC_GC
+	/*
+	 * Async GC (backport of Barry Song's RFC PATCH, see zram_drv.c):
+	 * gc_map marks swap slots whose free has been deferred to gc_work.
+	 */
+	unsigned long *gc_map;
+	struct work_struct gc_work;
+#endif
 };
 #endif
