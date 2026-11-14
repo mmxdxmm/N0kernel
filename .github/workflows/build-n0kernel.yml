@@ -23,8 +23,10 @@ on:
         type: string
         default: ''
 
-# 匹配「已移植内存优化特性」的源码仓库：异步 GC + 默认 lz4 + lz4/zstd 后端。
-# 编译前后由 build_n0kernel.sh 的 verify_memopt_config() 断言配置生效。
+# 匹配「原版 lz4 v1.10.0（含 NEON）+ 主线 MGLRU（取代 uksm）+ 关闭 KSM/UKSM」的源码仓库：
+# 异步 GC + 默认 lz4 + lz4/zstd 后端 + 多代 LRU。
+# 编译前后由 build_n0kernel.sh 的 verify_memopt_config() 断言配置生效，
+# STRICT_WARNINGS=1 保证编译日志无 error/warning。
 # 两个独立 job：standard（无 KSU）与 sukisu-ultra（带 SukiSU-Ultra）。
 # 拆成 job 而不是单 job 的 variant 矩阵，是因为 GitHub 的 jobs.<id>.if
 # 不允许引用 matrix context；这里 job 级条件只用 inputs，device 矩阵留在各 job 内部。
@@ -61,7 +63,20 @@ jobs:
           grep -q 'verify_memopt_config' build_n0kernel.sh
           grep -q 'comp_algorithm=lz4' anykernel-${{ matrix.device }}/ramdisk/n0kernel/system.prop
           grep -Eq '^defprop persist\.n0kernel\.zram\.comp_algorithm[[:space:]]+lz4' anykernel-${{ matrix.device }}/ramdisk/n0kernel/n0kernel-tune.sh
-          echo "[CI] 源码标记校验通过：异步 GC + lz4 默认压缩器 + 运行时脚本 + 脚本配置自检"
+          grep -q 'config LRU_GEN' mm/Kconfig
+          grep -q 'lru_gen_age_node' mm/vmscan.c
+          grep -q 'in_lru_fault' include/linux/sched.h
+          grep -qE 'LZ4_VERSION_MINOR[[:space:]]+10' lib/lz4/lz4.h
+          grep -q 'lz4accel.o' lib/lz4/Makefile
+          grep -q '^CONFIG_LRU_GEN=y' arch/arm64/configs/${{ matrix.device }}_defconfig
+          grep -q '^# CONFIG_KSM is not set' arch/arm64/configs/${{ matrix.device }}_defconfig
+          grep -q '^# CONFIG_UKSM is not set' arch/arm64/configs/${{ matrix.device }}_defconfig
+          grep -q 'lru_gen/enabled' anykernel-${{ matrix.device }}/ramdisk/n0kernel/n0kernel-tune.sh
+          grep -q 'persist.n0kernel.mglru.enabled' anykernel-${{ matrix.device }}/ramdisk/n0kernel/system.prop
+          grep -q '^CONFIG_LRU_GEN_ENABLED=y' arch/arm64/configs/${{ matrix.device }}_defconfig
+          grep -qE '__ATTR\(|lru_gen_enabled_attr' mm/vmscan.c
+          grep -q 'STRICT_WARNINGS' build_n0kernel.sh
+          echo "[CI] 源码标记校验通过：原版 lz4 1.10.0 + NEON + MGLRU + KSM/UKSM 关闭 + 双设备联动"
 
       - name: Build Kernel (${{ matrix.device }} / standard)
         env:
@@ -122,7 +137,20 @@ jobs:
           grep -q 'verify_memopt_config' build_n0kernel.sh
           grep -q 'comp_algorithm=lz4' anykernel-${{ matrix.device }}/ramdisk/n0kernel/system.prop
           grep -Eq '^defprop persist\.n0kernel\.zram\.comp_algorithm[[:space:]]+lz4' anykernel-${{ matrix.device }}/ramdisk/n0kernel/n0kernel-tune.sh
-          echo "[CI] 源码标记校验通过：异步 GC + lz4 默认压缩器 + 运行时脚本 + 脚本配置自检"
+          grep -q 'config LRU_GEN' mm/Kconfig
+          grep -q 'lru_gen_age_node' mm/vmscan.c
+          grep -q 'in_lru_fault' include/linux/sched.h
+          grep -qE 'LZ4_VERSION_MINOR[[:space:]]+10' lib/lz4/lz4.h
+          grep -q 'lz4accel.o' lib/lz4/Makefile
+          grep -q '^CONFIG_LRU_GEN=y' arch/arm64/configs/${{ matrix.device }}_defconfig
+          grep -q '^# CONFIG_KSM is not set' arch/arm64/configs/${{ matrix.device }}_defconfig
+          grep -q '^# CONFIG_UKSM is not set' arch/arm64/configs/${{ matrix.device }}_defconfig
+          grep -q 'lru_gen/enabled' anykernel-${{ matrix.device }}/ramdisk/n0kernel/n0kernel-tune.sh
+          grep -q 'persist.n0kernel.mglru.enabled' anykernel-${{ matrix.device }}/ramdisk/n0kernel/system.prop
+          grep -q '^CONFIG_LRU_GEN_ENABLED=y' arch/arm64/configs/${{ matrix.device }}_defconfig
+          grep -qE '__ATTR\(|lru_gen_enabled_attr' mm/vmscan.c
+          grep -q 'STRICT_WARNINGS' build_n0kernel.sh
+          echo "[CI] 源码标记校验通过：原版 lz4 1.10.0 + NEON + MGLRU + KSM/UKSM 关闭 + 双设备联动"
 
       - name: Build Kernel (${{ matrix.device }} / sukisu-ultra)
         env:
@@ -139,10 +167,10 @@ jobs:
       - name: Upload flashable zip
         uses: actions/upload-artifact@v4
         with:
-          name: N0kernel_${{ matrix.device }}_sukisu-ultra_anykernel3
+          name: N0kernel_${{ matrix.device }}_sukisu-ultra-v3.2.0_anykernel3
           path: |
             N0kernel_${{ matrix.device }}_*_anykernel3.zip
             build_${{ matrix.device }}_sukisu-ultra.txt
-            build_${{ matrix.device }}_ksu.log
-            build_out/${{ matrix.device }}_ksu/.config
+            build_${{ matrix.device }}_sukisu-ultra-v3.2.0.log
+            build_out/${{ matrix.device }}_sukisu-ultra-v3.2.0/.config
           if-no-files-found: error

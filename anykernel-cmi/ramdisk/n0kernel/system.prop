@@ -1,4 +1,4 @@
-# N0kernel 运行时开关默认值（stage C 清单，共 11 个主开关）
+# N0kernel 运行时开关默认值（stage C 清单，共 10 个主开关）
 # Magisk/KSU 模块加载本文件；无 root 方案时 n0kernel-tune.sh 用 defprop 自行兜底。
 # 修改方式：setprop persist.n0kernel.<key> <value> 后重启，或编辑本文件。
 # zram 压缩器：lz4（默认，低延迟低 CPU），可切 lz4kd / zmako_h / lz4k_oplus / zstd / zmako
@@ -15,12 +15,9 @@ persist.n0kernel.swap.enable=0
 persist.n0kernel.vm.swappiness=100
 # 提前异步回收，减少 direct reclaim
 persist.n0kernel.vm.watermark_scale_factor=100
-# 设 0 完全关闭 UKSM
-persist.n0kernel.uksm.run=1
-# 把默认 95 降下来（核心流畅开关，范围 10-99）
-persist.n0kernel.uksm.max_cpu=30
-# full / medium / low / quiet
-persist.n0kernel.uksm.governor=low
+# MGLRU（多代 LRU）取代 UKSM：默认启用；min_ttl_ms 抑制抖动（毫秒）
+persist.n0kernel.mglru.enabled=y
+persist.n0kernel.mglru.min_ttl_ms=1000
 # lmkd 杀进程阈值：空=沿用 Rom（cmi 走 simple_lmk，cas 走标准 lmkd，语义不同）
 persist.n0kernel.lmk.minfree=
 # 辅助属性（不计入 11 个主开关）：swap.enable=1 时的 swapon 目标

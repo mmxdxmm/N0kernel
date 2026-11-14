@@ -1,5 +1,9 @@
 #!/bin/bash
-# N0kernel 一键编译脚本（匹配「已移植内存优化特性」的源码仓库）
+# N0kernel 一键编译脚本（匹配「原版 lz4 v1.10.0 + 主线 MGLRU + 关闭 KSM/UKSM」源码仓库）
+#
+# 本次移植：mm 引入 multi-gen LRU（CONFIG_LRU_GEN，取代 uksm）；
+# lib/lz4 保持原版 v1.10.0（含 arm64 NEON 快路径）——升级到 v1.11.1 会造成实机卡死，已回退；
+# uksm/ksm 全面关闭；运行时开关切到 /sys/kernel/mm/lru_gen/{enabled,min_ttl_ms}。
 #
 # 与旧 build.sh / build_test.sh 的关键差异：
 #   - 不再 unzip Makefile2.zip/change2.zip：自定义文件已固化进仓库，解压会抹掉 A/B/C/D 的全部修复
@@ -7,10 +11,11 @@
 #   - AnyKernel3 克隆分支 main -> master（仓库默认分支为 master）
 #   - KSU 默认关闭（scripts/config -d KSU）；--ksu 时完整集成 SukiSU-Ultra(susfs-1.5.5)，
 #     并强制用 ksu_change.zip 覆盖 throne_tracker.c（修「安装新应用卡死」）
-#   - 支持 cas / cmi 双设备；每个设备编译后立即把产物另存 build_out/$DEVICE/（KSU 版另存 *_ksu/）
+#   - 支持 cas / cmi 双设备；每个设备编译后立即把产物另存 build_out/$DEVICE/（KSU 版另存 *_sukisu-ultra-v3.2.0/）
 #   - 打包用仓库内 anykernel-$DEVICE/（含定制 anykernel.sh + C 的运行时开关）
-#   - 内存优化联动：默认 zram 压缩器强制 lz4、启用 CONFIG_ZRAM_ASYNC_GC，
-#     编译前后各做一次配置自检（verify_memopt_config），不符即拒绝编译
+#   - 内存优化联动：zram 默认 lz4 + CONFIG_ZRAM_ASYNC_GC + CONFIG_LRU_GEN 启用、
+#     KSM/UKSM 关闭；编译前后各做一次配置自检（verify_memopt_config），不符即拒绝编译
+#   - STRICT_WARNINGS=1（默认）：编译日志出现 error/warning 即拒绝打包
 #   - zip 名中的版本串默认取编译当天日期 YYYYMMDD（可用 KERNEL_TAG 显式覆盖）
 #
 # 用法:
@@ -23,6 +28,7 @@ set -o pipefail
 ROOT=$PWD
 KERNEL_TAG=${KERNEL_TAG:-$(date +%Y%m%d)}
 OUT_DIR=${OUT_DIR:-$ROOT}
+STRICT_WARNINGS=${STRICT_WARNINGS:-1}
 CLANG_URL="https://github.com/mmxdxmm/aosp-clang/releases/download/main-kernel/clang-r547379.tar.gz"
 # 国内/受限网络走中转（只影响工具链下载，不影响编译产物）：
 #   MIRROR_PREFIX="https://<中转域名>/<你的token>/" bash build_n0kernel.sh cas
@@ -41,7 +47,7 @@ usage() {
 
 选项:
   --ksu        启用 KSU：拉取 SukiSU-Ultra(susfs-1.5.5) + susfs-1.5.5.zip 补丁 +
-               ksu_change.zip 覆盖 throne_tracker.c（默认关闭；产物另存 *_ksu/）
+               ksu_change.zip 覆盖 throne_tracker.c（默认关闭；产物另存 *_sukisu-ultra-v3.2.0/）
   --pack-only  仅用 build_out/ 下已有 Image+dtb 打包刷机 zip（不编译）
   --local-ak3  跳过 AnyKernel3 clone，直接用仓库内置 anykernel-$DEVICE/ 模板
   -h/--help    显示本帮助
@@ -78,9 +84,10 @@ case "$DEVICE_ARG" in
   *) echo "未知设备: $DEVICE_ARG"; usage; exit 1;;
 esac
 
-# KSU 版产物与刷机包独立命名/独立目录，绝不覆盖无 KSU 版本
+# SukiSU-Ultra 版产物与刷机包独立命名/独立目录，绝不覆盖无 KSU 版本
+# 后缀用准确版本标识 sukisu-ultra-v3.2.0（历史曾用 _ksu，易与 KSU 变量名混淆）
 OUT_SUFFIX=""
-[ "$KSU" = "1" ] && OUT_SUFFIX="_ksu"
+[ "$KSU" = "1" ] && OUT_SUFFIX="_sukisu-ultra-v3.2.0"
 
 # ---------- 工具链：clang/bin/clang 已存在则跳过；否则从 clang.tar.gz 解压 ----------
 if [ "$PACK_ONLY" = "1" ]; then
@@ -152,8 +159,10 @@ apply_config_extras() {
     -e CONFIG_LZ4KD_DECOMPRESS \
     -e CONFIG_ZRAM_BACKEND_ZMAKO \
     -e CONFIG_ZRAM_BACKEND_ZMAKO_H \
-    -e CONFIG_KSM \
-    -e CONFIG_UKSM
+    -d CONFIG_KSM \
+    -d CONFIG_UKSM \
+    -e CONFIG_LRU_GEN \
+    -e CONFIG_LRU_GEN_ENABLED
 }
 
 # ---------- KSU 集成（--ksu 时）----------
@@ -182,6 +191,19 @@ clone_ksu() {
   return 1
 }
 
+# susfs-1.5.5.zip 内含整份 include/linux/sched.h；--ksu 时 unzip -o 会覆盖掉
+# MGLRU 的 struct task_struct::in_lru_fault 字段，而 mm_inline.h 的
+# lru_gen_in_fault() 在 CONFIG_LRU_GEN 下仍引用它，mm/page_alloc.c 会直接
+# 报 "no member named 'in_lru_fault' in 'struct task_struct'"。
+# 覆盖后幂等补回，同时保留 SUSFS 自己的 ANDROID_KABI/KSU 字段。
+restore_mglru_sched_field() {
+  local h="$ROOT/include/linux/sched.h"
+  python3 "$ROOT/scripts/restore_mglru_sched_field.py" "$h" || {
+    echo "[MGLRU] 无法补回 sched.h 的 in_lru_fault 字段，拒绝编译"; exit 1; }
+  grep -q 'in_lru_fault' "$h" || {
+    echo "[MGLRU] 补回后校验仍失败，拒绝编译"; exit 1; }
+}
+
 setup_ksu() {
   echo "[KSU] 集成 $KSU_REPO (susfs-1.5.5)"
   # 记录集成前已修改的已跟踪文件：cleanup 时只还原「集成期间新产生」的改动，
@@ -202,6 +224,9 @@ setup_ksu() {
   # 3) SUSFS 内核侧补丁；记录覆盖清单以便编译后还原源码工作区
   unzip -Z1 "$ROOT/susfs-1.5.5.zip" | grep -v '/$' > "$KSU_OVERLAY_LIST"
   unzip -o -q "$ROOT/susfs-1.5.5.zip" -d "$ROOT"
+  # 3b) susfs 覆盖了 include/linux/sched.h，必须补回 MGLRU 字段；
+  #     否则 mm_inline.h 的 lru_gen_in_fault() 会让 mm/page_alloc.c 编译失败。
+  restore_mglru_sched_field
   # 4) 关键：覆盖 throne_tracker.c，修复「安装新应用卡死」
   unzip -o -q "$ROOT/ksu_change.zip" -d "$ROOT"
   grep -q "pkg_name_node" "$ROOT/KernelSU/kernel/throne_tracker.c" || {
@@ -264,6 +289,8 @@ apply_memopt_config() {
     -d CONFIG_ZRAM_DEF_COMP_ZMAKO \
     -d CONFIG_ZRAM_DEF_COMP_ZMAKO_H \
     -e CONFIG_ZRAM_DEF_COMP_LZ4 \
+    -e CONFIG_LRU_GEN \
+    -e CONFIG_LRU_GEN_ENABLED \
     --set-str CONFIG_ZRAM_DEF_COMP lz4
 }
 
@@ -286,16 +313,23 @@ CONFIG_ZRAM_BACKEND_LZ4=y
 CONFIG_ZRAM_BACKEND_ZSTD=y
 CONFIG_ZRAM_DEF_COMP_LZ4=y
 CONFIG_ZRAM_DEF_COMP="lz4"
+CONFIG_LRU_GEN=y
+CONFIG_LRU_GEN_ENABLED=y
 CONFIG_LZ4_COMPRESS=y
 CONFIG_LZ4_DECOMPRESS=y
 CONFIG_ZSTD_COMPRESS=y
 CONFIG_ZSTD_DECOMPRESS=y
 MEMOPT_CFG
+  # KSM/UKSM 必须关闭（.config 中不允许出现 =y）
+  if grep -qE '^CONFIG_(KSM|UKSM)=y' "$cfg"; then
+    vlog "[verify] CONFIG_KSM / CONFIG_UKSM 仍处于开启状态（MGLRU 已取代 uksm）"
+    bad=1
+  fi
   if [ "$bad" != "0" ]; then
     vlog "[verify] 内存优化配置未生效，拒绝继续编译（检查 defconfig / Kconfig / scripts/config）"
     exit 1
   fi
-  vlog "[verify] 内存优化配置 OK：zram=lz4, async_gc=y, lz4/zstd 后端已启用"
+  vlog "[verify] 内存优化配置 OK：lz4=zram 默认, async_gc=y, MGLRU=y, KSM/UKSM=off"
 }
 
 verify_source_markers() {
@@ -303,20 +337,53 @@ verify_source_markers() {
     echo "[verify] 源码缺少 CONFIG_ZRAM_ASYNC_GC，疑似拉错分支/旧源码"; exit 1; }
   grep -q 'zram_gc_work' drivers/block/zram/zram_drv.c || {
     echo "[verify] 源码缺少 zram 异步 GC 实现"; exit 1; }
+  grep -q 'config LRU_GEN' mm/Kconfig || {
+    echo "[verify] 源码缺少 CONFIG_LRU_GEN（MGLRU 未移植）"; exit 1; }
+  grep -q 'lru_gen_age_node' mm/vmscan.c || {
+    echo "[verify] 源码缺少 MGLRU aging 实现"; exit 1; }
+  # KSU/susfs 覆盖 sched.h 会冲掉该字段；编译前显式拦截，避免编译到一半才报错
+  grep -q 'in_lru_fault' include/linux/sched.h || {
+    echo "[verify] sched.h 缺少 CONFIG_LRU_GEN 的 in_lru_fault 字段（KSU/susfs 覆盖会冲掉）"; exit 1; }
+  grep -qE 'LZ4_VERSION_MINOR[[:space:]]+10' lib/lz4/lz4.h || {
+    echo "[verify] lib/lz4 不是原版 v1.10.0"; exit 1; }
+  grep -q 'lz4accel.o' lib/lz4/Makefile || {
+    echo "[verify] lib/lz4/Makefile 未启用 arm64 NEON 快路径"; exit 1; }
   local d
   for d in $DEVICES; do
     grep -q 'CONFIG_ZRAM_DEF_COMP="lz4"' "arch/arm64/configs/${d}_defconfig" || {
       echo "[verify] ${d}_defconfig 默认压缩器不是 lz4"; exit 1; }
+    grep -q '^CONFIG_LRU_GEN=y' "arch/arm64/configs/${d}_defconfig" || {
+      echo "[verify] ${d}_defconfig 未启用 MGLRU"; exit 1; }
+    grep -q '^# CONFIG_KSM is not set' "arch/arm64/configs/${d}_defconfig" || {
+      echo "[verify] ${d}_defconfig 未关闭 KSM"; exit 1; }
+    grep -q '^# CONFIG_UKSM is not set' "arch/arm64/configs/${d}_defconfig" || {
+      echo "[verify] ${d}_defconfig 未关闭 UKSM"; exit 1; }
+    grep -q 'lru_gen/enabled' "anykernel-${d}/ramdisk/n0kernel/n0kernel-tune.sh" || {
+      echo "[verify] anykernel-${d} 运行时未联动 MGLRU"; exit 1; }
   done
-  echo "[verify] 源码标记 OK（异步 GC + 双设备 lz4 默认）"
+  echo "[verify] 源码标记 OK（原版 lz4 1.10.0 + NEON + MGLRU + KSM/UKSM 关闭 + 双设备联动）"
 }
 
 summarize_build_log() {
   local log=$1
   [ -f "$log" ] || return 0
+  local nerr nwarn
+  # 只认编译器/链接器诊断，不把 git/curl/fetch-pack 的网络噪声当编译错误。
+  # KSU 的 Kbuild 会在编译期间执行 git 取版本号，网络抖动会输出
+  # "error: RPC failed; curl 56 ..."；旧版宽松的 'error:' 匹配会把它计为
+  # 编译错误并拒绝打包（编译本体其实是成功的）。
+  # 匹配形态：path.c:12:34: error: / clang: error: / make[2]: *** Error 1
+  local DIAG_ERR='(^|[[:space:]])[^[:space:]]+\.(c|h|cc|cpp|C|S|s|o|ld):[0-9]+(:[0-9]+)?:[[:space:]]*error:|(^|[[:space:]])(clang|clang\+\+|gcc|cc|ld|ld\.lld|lld|collect2|as|ar|objcopy):[[:space:]]*error:|Error [0-9]+'
+  local DIAG_WARN='(^|[[:space:]])[^[:space:]]+\.(c|h|cc|cpp|C|S|s|o):[0-9]+(:[0-9]+)?:[[:space:]]*warning:|(^|[[:space:]])(clang|clang\+\+|gcc|cc|ld|ld\.lld|lld|collect2):[[:space:]]*warning:'
+  nerr=$(grep -ciE "$DIAG_ERR" "$log" || true)
+  nwarn=$(grep -ciE "$DIAG_WARN" "$log" || true)
   echo "[build] 日志统计: $log"
-  echo "  error   : $(grep -ciE '(^|[[:space:]])error:|Error [0-9]+' "$log" || true)"
-  echo "  warning : $(grep -ciE '(^|[[:space:]])warning:' "$log" || true)"
+  echo "  error   : $nerr"
+  echo "  warning : $nwarn"
+  if [ "$STRICT_WARNINGS" = "1" ]; then
+    [ "$nerr" = "0" ] || { echo "[build] 编译日志存在 error，拒绝打包"; exit 1; }
+    [ "$nwarn" = "0" ] || { echo "[build] 编译日志存在 warning，拒绝打包（STRICT_WARNINGS=1）"; exit 1; }
+  fi
 }
 
 apply_ksu_switch() {

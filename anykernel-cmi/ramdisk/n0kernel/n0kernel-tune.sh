@@ -1,7 +1,7 @@
 #!/system/bin/sh
 # N0kernel 运行时调参（落地 stage C 的 zram-first 开关清单）
 # 读取 persist.n0kernel.* 系统属性，写 sysfs / sysctl。
-# 默认：zram 回写 OFF、磁盘 swap OFF；UKSM max_cpu 由默认 95 限到 30。
+# 默认：zram 回写 OFF、磁盘 swap OFF；MGLRU 启用并设 min_ttl_ms 抑制抖动。
 # 由 init.n0kernel.rc (on property:sys.boot_completed=1) 或
 # Magisk/KernelSU 模块的 post-fs-data.sh / service.sh 调用。
 # 用户 setprop 改属性后重启（或再次执行本脚本）即可生效。
@@ -15,9 +15,8 @@ defprop persist.n0kernel.zram.writeback             0
 defprop persist.n0kernel.swap.enable                0
 defprop persist.n0kernel.vm.swappiness              100
 defprop persist.n0kernel.vm.watermark_scale_factor  100
-defprop persist.n0kernel.uksm.run                   1
-defprop persist.n0kernel.uksm.max_cpu               30
-defprop persist.n0kernel.uksm.governor              low
+defprop persist.n0kernel.mglru.enabled             y
+defprop persist.n0kernel.mglru.min_ttl_ms          1000
 # 以下默认沿用 Rom / 留空即不干预：
 #   zram.disksize / zram.backing_dev / swap.device(辅助) / lmk.minfree
 
@@ -52,10 +51,9 @@ fi
 w /proc/sys/vm/swappiness              "$(getprop persist.n0kernel.vm.swappiness)"
 w /proc/sys/vm/watermark_scale_factor "$(getprop persist.n0kernel.vm.watermark_scale_factor)"
 
-# --- UKSM：保留页合并(保活)，但压掉 95% CPU 抢占(流畅) ---
-w /sys/kernel/mm/uksm/run                 "$(getprop persist.n0kernel.uksm.run)"
-w /sys/kernel/mm/uksm/max_cpu_percentage "$(getprop persist.n0kernel.uksm.max_cpu)"
-w /sys/kernel/mm/uksm/cpu_governor       "$(getprop persist.n0kernel.uksm.governor)"
+# --- MGLRU：多代 LRU 取代 UKSM（enabled 总开关 / min_ttl_ms 抑制抖动）---
+w /sys/kernel/mm/lru_gen/enabled    "$(getprop persist.n0kernel.mglru.enabled)"
+w /sys/kernel/mm/lru_gen/min_ttl_ms "$(getprop persist.n0kernel.mglru.min_ttl_ms)"
 
 # --- LMK：仅当 simple_lmk 的 minfree 节点存在才写（cmi）。
 #     cas 走标准 userspace lmkd，路径不同，此处不硬编码，由 Rom 决定。 ---
